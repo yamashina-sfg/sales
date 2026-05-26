@@ -847,6 +847,7 @@ function renderApp() {
     {id:'shift', ico:'📅', lbl:'シフト'},
     {id:'mypage', ico:'👤', lbl:'マイページ'}
   ];
+  tabs.push({id:'survey', ico:'📊', lbl:'SNS調査'});
   if (u.role === 'admin') tabs.push({id:'admin', ico:'⚙️', lbl:'管理'});
 
   var navHtml = '';
@@ -871,7 +872,7 @@ function renderApp() {
 function switchTab(t) {
   ST.tab = t;
   document.querySelectorAll('.ntab').forEach(function(b) {
-    b.classList.toggle('active', b.textContent.trim().indexOf({counter:'カウンター',chist:'履歴',progress:'進捗管理',reports:'日報',ranking:'ランキング',shift:'シフト',mypage:'マイページ',admin:'管理'}[t]) >= 0);
+    b.classList.toggle('active', b.textContent.trim().indexOf({counter:'カウンター',chist:'履歴',progress:'進捗管理',reports:'日報',ranking:'ランキング',shift:'シフト',mypage:'マイページ',survey:'SNS調査',admin:'管理'}[t]) >= 0);
   });
   reTab();
 }
@@ -901,6 +902,7 @@ function renderTab() {
   if (ST.tab === 'ranking') return renderRanking();
   if (ST.tab === 'shift') return renderShift();
   if (ST.tab === 'mypage') return renderMyPage();
+  if (ST.tab === 'survey') return renderSurvey();
   if (ST.tab === 'admin') return renderAdmin();
   return '';
 }
@@ -909,6 +911,7 @@ function bindTab() {
   else if (ST.tab === 'progress') bindProgress();
   else if (ST.tab === 'reports') bindReports();
   else if (ST.tab === 'shift') bindShift();
+  else if (ST.tab === 'survey') bindSurvey();
   else if (ST.tab === 'admin') bindAdmin();
 }
 
@@ -2135,6 +2138,213 @@ function saveTeamSettings() {
 }
 
 // ============================================================
+// SNS SURVEY
+// ============================================================
+var SURVEY_STATE = { list: [], search: '', detail: null, editing: null };
+
+function loadSurvey() {
+  return DB.from('sns_survey').select('*').then(function(res) {
+    SURVEY_STATE.list = res.data || [];
+  });
+}
+
+function renderSurvey() {
+  var html = '<div>';
+  // 詳細表示中
+  if (SURVEY_STATE.detail) {
+    var d = SURVEY_STATE.detail;
+    var isEditing = SURVEY_STATE.editing === d.id;
+    html += '<div style="margin-bottom:12px"><button class="btn btn-s bsm" onclick="closeSurveyDetail()">← 一覧に戻る</button></div>';
+    html += '<div class="card">';
+    if (isEditing) {
+      html += '<h3 class="sec-title">✏️ 編集</h3>';
+      var fields = [
+        {key:'timestamp', label:'タイムスタンプ'},
+        {key:'purpose', label:'SNS運用の目的'},
+        {key:'post_style', label:'理想の投稿スタイル'},
+        {key:'temperature', label:'アカウントの温度感'},
+        {key:'content', label:'発信したい内容'},
+        {key:'target', label:'届けたい相手'},
+        {key:'reference_accounts', label:'参考アカウント'}
+      ];
+      fields.forEach(function(f) {
+        html += '<div class="fg"><label>' + f.label + '</label>' +
+          '<input type="text" id="se-' + f.key + '" value="' + (d[f.key]||'').replace(/"/g,'&quot;') + '" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit"/></div>';
+      });
+      html += '<div style="display:flex;gap:8px;margin-top:12px">' +
+        '<button class="btn btn-p" onclick="saveSurveyEdit(\'' + d.id + '\')">✓ 保存</button>' +
+        '<button class="btn btn-s" onclick="cancelSurveyEdit()">キャンセル</button>' +
+        '</div>';
+    } else {
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">' +
+        '<h3 class="sec-title" style="margin-bottom:0;border:none">📋 詳細</h3>' +
+        '<button class="btn btn-s bsm" onclick="startSurveyEdit(\'' + d.id + '\')">✏️ 編集</button>' +
+        '</div>';
+      var rows = [
+        {label:'タイムスタンプ', val: d.timestamp},
+        {label:'SNS運用の目的', val: d.purpose},
+        {label:'理想の投稿スタイル', val: d.post_style},
+        {label:'アカウントの温度感', val: d.temperature},
+        {label:'発信したい内容', val: d.content},
+        {label:'届けたい相手', val: d.target},
+        {label:'参考アカウント', val: d.reference_accounts}
+      ];
+      rows.forEach(function(r) {
+        if (!r.val) return;
+        html += '<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13px">' +
+          '<div style="font-size:11px;color:var(--dim);margin-bottom:3px">' + r.label + '</div>' +
+          '<div style="font-weight:600">' + (r.val||'―') + '</div>' +
+          '</div>';
+      });
+    }
+    html += '</div></div>';
+    return html;
+  }
+
+  // 一覧表示
+  var filtered = SURVEY_STATE.list.filter(function(d) {
+    if (!SURVEY_STATE.search) return true;
+    var q = SURVEY_STATE.search.toLowerCase();
+    return (d.purpose||'').toLowerCase().includes(q) ||
+      (d.target||'').toLowerCase().includes(q) ||
+      (d.reference_accounts||'').toLowerCase().includes(q) ||
+      (d.post_style||'').toLowerCase().includes(q);
+  });
+
+  html += '<div class="ch"><h2>📊 SNS調査一覧</h2>' +
+    '<button class="btn btn-p bsm" onclick="showAddSurvey()">＋ 追加</button></div>';
+
+  // 検索
+  html += '<div style="margin-bottom:12px">' +
+    '<input type="text" id="survey-search" placeholder="🔍 キーワードで検索..." value="' + SURVEY_STATE.search + '" ' +
+    'style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit"/>' +
+    '</div>';
+
+  // 追加フォーム
+  if (SURVEY_STATE.adding) {
+    html += '<div class="card" style="margin-bottom:14px">';
+    html += '<h3 class="sec-title">＋ 新規追加</h3>';
+    var addFields = [
+      {key:'timestamp', label:'タイムスタンプ', ph:'例: 2026/05/26'},
+      {key:'purpose', label:'SNS運用の目的', ph:'例: 認知拡大・集客'},
+      {key:'post_style', label:'理想の投稿スタイル', ph:'例: 写真メイン'},
+      {key:'temperature', label:'アカウントの温度感', ph:'例: 明るく親しみやすい'},
+      {key:'content', label:'発信したい内容', ph:'例: イベント情報・日常'},
+      {key:'target', label:'届けたい相手', ph:'例: 20代女性'},
+      {key:'reference_accounts', label:'参考アカウント', ph:'例: @example'}
+    ];
+    addFields.forEach(function(f) {
+      html += '<div class="fg"><label>' + f.label + '</label>' +
+        '<input type="text" id="sa-' + f.key + '" placeholder="' + f.ph + '" ' +
+        'style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit"/></div>';
+    });
+    html += '<div style="display:flex;gap:8px;margin-top:12px">' +
+      '<button class="btn btn-p" onclick="addSurveyRecord()">✓ 追加</button>' +
+      '<button class="btn btn-s" onclick="cancelAddSurvey()">キャンセル</button>' +
+      '</div></div>';
+  }
+
+  if (filtered.length === 0) {
+    html += '<div class="empty"><div class="ei">📭</div>データがありません</div>';
+  } else {
+    html += '<div style="display:flex;flex-direction:column;gap:8px">';
+    filtered.forEach(function(d) {
+      html += '<div class="card" style="cursor:pointer" onclick="openSurveyDetail(\'' + d.id + '\')">' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start">' +
+        '<div style="flex:1">' +
+        '<div style="font-weight:700;font-size:14px;margin-bottom:4px">' + (d.purpose || '目的未入力') + '</div>' +
+        '<div style="font-size:12px;color:var(--dim)">対象: ' + (d.target||'―') + '　スタイル: ' + (d.post_style||'―') + '</div>' +
+        (d.reference_accounts ? '<div style="font-size:12px;color:var(--dim);margin-top:2px">参考: ' + d.reference_accounts + '</div>' : '') +
+        '</div>' +
+        '<div style="font-size:11px;color:var(--dim);white-space:nowrap;margin-left:8px">' + (d.timestamp||'') + '</div>' +
+        '</div></div>';
+    });
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+function bindSurvey() {
+  var inp = document.getElementById('survey-search');
+  if (inp) inp.addEventListener('input', function() {
+    SURVEY_STATE.search = this.value;
+    reTab();
+    setTimeout(bindSurvey, 0);
+  });
+  // 検索後フォーカス維持
+  if (inp && SURVEY_STATE.search) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+}
+
+function openSurveyDetail(id) {
+  var d = SURVEY_STATE.list.find(function(x) { return x.id === id; });
+  if (d) { SURVEY_STATE.detail = d; SURVEY_STATE.editing = null; reTab(); }
+}
+
+function closeSurveyDetail() {
+  SURVEY_STATE.detail = null;
+  SURVEY_STATE.editing = null;
+  reTab();
+  setTimeout(bindSurvey, 0);
+}
+
+function startSurveyEdit(id) {
+  SURVEY_STATE.editing = id;
+  reTab();
+}
+
+function cancelSurveyEdit() {
+  SURVEY_STATE.editing = null;
+  reTab();
+}
+
+function saveSurveyEdit(id) {
+  var fields = ['timestamp','purpose','post_style','temperature','content','target','reference_accounts'];
+  var payload = {id: id};
+  fields.forEach(function(f) {
+    var el = document.getElementById('se-' + f);
+    if (el) payload[f] = el.value;
+  });
+  DB.from('sns_survey').upsert(payload).then(function() {
+    var idx = SURVEY_STATE.list.findIndex(function(x) { return x.id === id; });
+    if (idx >= 0) SURVEY_STATE.list[idx] = Object.assign(SURVEY_STATE.list[idx], payload);
+    SURVEY_STATE.detail = SURVEY_STATE.list[idx];
+    SURVEY_STATE.editing = null;
+    toast('保存しました！');
+    reTab();
+  });
+}
+
+function showAddSurvey() {
+  SURVEY_STATE.adding = true;
+  reTab();
+  setTimeout(bindSurvey, 0);
+}
+
+function cancelAddSurvey() {
+  SURVEY_STATE.adding = false;
+  reTab();
+  setTimeout(bindSurvey, 0);
+}
+
+function addSurveyRecord() {
+  var fields = ['timestamp','purpose','post_style','temperature','content','target','reference_accounts'];
+  var payload = {id: 'survey_' + Date.now(), team_id: ST.teamId};
+  fields.forEach(function(f) {
+    var el = document.getElementById('sa-' + f);
+    if (el) payload[f] = el.value;
+  });
+  DB.from('sns_survey').insert(payload).then(function() {
+    SURVEY_STATE.list.push(payload);
+    SURVEY_STATE.adding = false;
+    toast('追加しました！');
+    reTab();
+    setTimeout(bindSurvey, 0);
+  });
+}
+
+// ============================================================
 // BOOT
 // ============================================================
 (function boot() {
@@ -2146,7 +2356,9 @@ function saveTeamSettings() {
     ST.teamName = session.teamName;
     ST.shiftWeek = mondayOf(todayStr());
     setHTML('<div class="loading"><div class="spin"></div>自動ログイン中...</div>');
-    loadData().then(function() { ST.mode = null; render(); }).catch(function() {
+    loadData().then(function() {
+      return loadSurvey();
+    }).then(function() { ST.mode = null; render(); }).catch(function() {
       clearSession();
       setHTML(renderLogin());
       bindLogin();
