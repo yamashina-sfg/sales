@@ -1,0 +1,2161 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ÉLAN Groupe営業管理</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+:root {
+  --bg: #eef2f7;
+  --surface: #ffffff;
+  --surface2: #e8edf5;
+  --border: #d0d8e8;
+  --text: #1a2640;
+  --dim: #7a8aaa;
+  --accent: #1e3a6e;
+  --danger: #c0392b;
+  --ok: #1a6640;
+  --gold: #b8860b;
+  --silver: #707070;
+  --bronze: #8b5e3c;
+  --r: 8px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 15px; }
+.mono { font-family: 'Courier New', Courier, monospace; }
+
+/* ===== MODE SELECT ===== */
+.mode-wrap { min-height: 100vh; background: linear-gradient(160deg, #0f1f3d 0%, #1e3a6e 60%, #162d5a 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 30px 20px; }
+.mode-logo { text-align: center; margin-bottom: 10px; }
+.mode-logo h1 { font-size: 26px; font-weight: 900; color: #fff; letter-spacing: .05em; font-family: "Yu Mincho","YuMincho","Hiragino Mincho ProN",serif; }
+.mode-logo .sub { font-size: 12px; color: rgba(255,255,255,.5); margin-top: 4px; letter-spacing: .1em; }
+.mode-user { font-size: 13px; color: rgba(255,255,255,.7); margin-bottom: 32px; }
+.mode-user span { color: #d4af37; font-weight: 700; }
+.mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; width: 100%; max-width: 420px; margin-bottom: 32px; }
+.mode-card { background: rgba(255,255,255,.07); border: 1.5px solid rgba(255,255,255,.15); border-radius: 14px; padding: 28px 16px 22px; text-align: center; cursor: pointer; transition: all .2s; position: relative; overflow: hidden; }
+.mode-card:hover { background: rgba(255,255,255,.13); border-color: rgba(255,255,255,.35); transform: translateY(-2px); }
+.mode-card:active { transform: scale(.97); }
+.mode-card.disabled { opacity: .55; cursor: not-allowed; }
+.mode-card.disabled:hover { transform: none; }
+.mode-card .mc-ico { font-size: 42px; margin-bottom: 12px; }
+.mode-card .mc-title { font-size: 17px; font-weight: 900; color: #fff; margin-bottom: 6px; }
+.mode-card .mc-sub { font-size: 11px; color: rgba(255,255,255,.55); line-height: 1.5; }
+.mode-card.active-card { border-color: #d4af37; background: rgba(212,175,55,.12); }
+.mode-badge { position: absolute; top: 10px; right: 10px; background: rgba(255,255,255,.2); color: rgba(255,255,255,.6); font-size: 9px; font-weight: 900; padding: 2px 7px; border-radius: 10px; letter-spacing: .05em; }
+.mode-logout { margin-top: 16px; background: none; border: 1px solid rgba(255,255,255,.2); color: rgba(255,255,255,.5); padding: 8px 20px; border-radius: 20px; cursor: pointer; font-size: 12px; font-family: inherit; }
+.mode-logout:hover { border-color: rgba(255,255,255,.4); color: rgba(255,255,255,.7); }
+/* ===== LOADING ===== */
+.loading { display: flex; align-items: center; justify-content: center; min-height: 100vh; gap: 10px; color: var(--dim); }
+.spin { width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ===== TOAST ===== */
+.toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: #1e3a6e; color: #fff; padding: 10px 20px; border-radius: 20px; font-size: 13px; z-index: 9999; white-space: nowrap; animation: tIn .3s, tOut .3s 2s forwards; }
+.toast.err { background: var(--danger); }
+@keyframes tIn { from { opacity: 0; transform: translateX(-50%) translateY(8px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+@keyframes tOut { to { opacity: 0; } }
+
+/* ===== LOGIN ===== */
+.lw { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg); }
+.lb { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 40px 36px; width: 90%; max-width: 400px; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+.ll { text-align: center; margin-bottom: 28px; }
+.ll h1 { font-size: 22px; font-weight: 800; letter-spacing: -.5px; }
+.ll .sub { font-size: 12px; color: var(--dim); margin-top: 4px; }
+.fg { margin-bottom: 14px; }
+.fg label { display: block; font-size: 12px; font-weight: 600; color: var(--dim); margin-bottom: 5px; }
+.fg input, .fg select { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r); font-size: 15px; font-family: inherit; background: var(--surface); color: var(--text); }
+.fg input:focus, .fg select:focus { outline: none; border-color: var(--accent); }
+.fg select option { background: var(--surface); }
+.lbtn { width: 100%; padding: 12px; background: #1e3a6e; color: #fff; border: none; border-radius: var(--r); font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit; margin-top: 6px; }
+.lbtn:hover { opacity: .85; }
+.lerr { font-size: 13px; color: var(--danger); background: #fff0f0; border: 1px solid #ffcccc; padding: 8px 12px; border-radius: 6px; margin-top: 8px; display: none; }
+.llink { text-align: center; margin-top: 14px; font-size: 13px; color: var(--dim); }
+.llink a { color: var(--accent); cursor: pointer; font-weight: 600; }
+.tbadge { text-align: center; font-weight: 700; font-size: 15px; margin-bottom: 16px; padding: 8px; background: var(--surface2); border-radius: 6px; }
+
+/* ===== APP SHELL ===== */
+.app { max-width: 1100px; margin: 0 auto; min-height: 100vh; }
+.hdr { background: var(--surface); border-bottom: 1px solid var(--border); padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+.hlogo { font-size: 16px; font-weight: 800; letter-spacing: -.5px; font-family: "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "HGS明朝E", serif; }
+.hteam { font-size: 11px; color: var(--dim); background: var(--surface2); padding: 2px 8px; border-radius: 10px; margin-left: 8px; }
+.hright { display: flex; align-items: center; gap: 10px; }
+.mnav { display: flex; align-items: center; gap: 4px; border: 1px solid var(--border); border-radius: var(--r); padding: 4px 8px; background: var(--surface2); }
+.mnav button { background: none; border: none; cursor: pointer; font-size: 14px; color: var(--dim); padding: 0 4px; }
+.mnav button:hover { color: var(--text); }
+.mnav span { font-size: 13px; font-weight: 700; min-width: 72px; text-align: center; }
+.uinfo { font-size: 13px; }
+.uname { font-weight: 700; }
+.urole { font-size: 11px; color: var(--dim); }
+.loutbtn { background: none; border: 1px solid var(--border); padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; font-family: inherit; color: var(--dim); }
+.loutbtn:hover { color: var(--text); border-color: var(--text); }
+
+/* ===== NAV ===== */
+.nav { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; }
+.nav::-webkit-scrollbar { display: none; }
+.ntab { flex: 1; min-width: 60px; padding: 10px 6px; background: none; border: none; cursor: pointer; font-size: 11px; color: var(--dim); font-family: inherit; border-bottom: 2px solid transparent; white-space: nowrap; display: flex; flex-direction: column; align-items: center; gap: 2px; transition: color .15s; }
+.ntab .ico { font-size: 16px; }
+.ntab.active { color: #1e3a6e; border-bottom-color: #1e3a6e; font-weight: 700; }
+.ntab:hover { color: var(--text); }
+.tc { padding: 16px; }
+
+/* ===== COMMON ===== */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 16px; }
+.sec-title { font-size: 14px; font-weight: 700; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.stabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+.stab { padding: 5px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 20px; cursor: pointer; font-size: 13px; color: var(--dim); font-family: inherit; }
+.stab.active { background: #1e3a6e; color: #fff; border-color: #1e3a6e; }
+.btn { padding: 10px 16px; border: none; border-radius: var(--r); font-size: 14px; cursor: pointer; font-family: inherit; font-weight: 600; }
+.btn-p { background: #1e3a6e; color: #fff; }
+.btn-s { background: var(--surface); color: var(--dim); border: 1px solid var(--border); }
+.btn-d { background: #fff0f0; color: var(--danger); border: 1px solid #ffcccc; }
+.btn:hover { opacity: .8; }
+.bsm { padding: 5px 10px; font-size: 12px; border-radius: 6px; }
+.empty { text-align: center; padding: 40px 16px; color: var(--dim); }
+.empty .ei { font-size: 32px; margin-bottom: 8px; }
+.divider { height: 1px; background: var(--border); margin: 14px 0; }
+.tw { overflow-x: auto; }
+.dt { width: 100%; border-collapse: collapse; background: var(--surface); min-width: 480px; }
+.dt th { background: var(--surface2); padding: 8px 10px; text-align: left; font-size: 12px; color: var(--dim); font-weight: 700; white-space: nowrap; border-bottom: 1px solid var(--border); }
+.dt td { padding: 8px 10px; font-size: 13px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.dt tr:last-child td { border-bottom: none; }
+.dt input { width: 60px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 5px; font-size: 13px; text-align: center; font-family: 'Courier New', monospace; background: var(--surface2); }
+.dt input:focus { outline: none; border-color: var(--text); }
+.dt input:disabled { opacity: .4; cursor: not-allowed; }
+.pts { font-family: 'Courier New', monospace; font-weight: 700; color: var(--dim); font-size: 12px; }
+.lck { font-family: 'Courier New', monospace; color: var(--dim); }
+
+/* ===== COUNTER ===== */
+.ch { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.ch h2 { font-size: 15px; font-weight: 700; }
+.cdate { font-size: 12px; color: var(--dim); font-family: 'Courier New', monospace; }
+.cgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
+.citem { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 12px 8px; text-align: center; cursor: pointer; user-select: none; transition: background .1s; }
+.citem:active { background: var(--surface2); transform: scale(.96); }
+.clbl { font-size: 11px; color: var(--dim); margin-bottom: 6px; }
+.ccnt { font-size: 28px; font-weight: 900; font-family: 'Courier New', monospace; }
+.cht { font-size: 10px; color: var(--dim); margin-top: 4px; }
+.cact { position: sticky; bottom: 0; background: var(--bg); padding: 12px 16px; border-top: 1px solid var(--border); display: flex; gap: 10px; margin: 0 -16px; margin-top: 16px; }
+
+/* ===== HISTORY ===== */
+.hgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+.hcard { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 12px; }
+.hcdate { font-size: 12px; font-weight: 700; color: var(--dim); margin-bottom: 8px; font-family: 'Courier New', monospace; }
+.hrow { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 0; border-bottom: 1px solid var(--border); }
+.hrow:last-child { border-bottom: none; }
+.hval { font-family: 'Courier New', monospace; font-weight: 700; }
+
+/* ===== PROGRESS ===== */
+.gran-row { display: flex; gap: 6px; margin-bottom: 12px; align-items: center; }
+.gran-row span { font-size: 12px; color: var(--dim); }
+.gtab { padding: 4px 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font-size: 12px; color: var(--dim); font-family: inherit; }
+.gtab.active { background: #1e3a6e; color: #fff; border-color: #1e3a6e; }
+.kgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); gap: 10px; }
+.kcard { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 12px; }
+.klbl { font-size: 12px; color: var(--dim); margin-bottom: 8px; }
+.krow { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; font-size: 13px; }
+.krow input { width: 60px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 5px; font-size: 13px; text-align: center; font-family: 'Courier New', monospace; background: var(--surface2); }
+.krow input:focus { outline: none; border-color: var(--text); }
+.pb { height: 5px; background: var(--surface2); border-radius: 3px; overflow: hidden; margin-bottom: 4px; }
+.pf { height: 100%; background: #1e3a6e; transition: width .4s; }
+.pf.good { background: var(--ok); }
+.pf.bad { background: var(--danger); }
+.pp { font-size: 13px; font-weight: 700; font-family: 'Courier New', monospace; }
+.pp.good { color: var(--ok); }
+.pp.bad { color: var(--danger); }
+
+/* ===== REPORTS ===== */
+.rform { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 16px; margin-bottom: 14px; }
+.rform h3 { font-size: 13px; color: var(--dim); margin-bottom: 12px; }
+.rform textarea { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: var(--r); font-size: 14px; font-family: inherit; resize: vertical; min-height: 64px; background: var(--surface2); }
+.rform textarea:focus { outline: none; border-color: var(--text); }
+.rlist { display: flex; flex-direction: column; gap: 10px; }
+.rcard { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 14px; }
+.rchead { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.rcav { width: 28px; height: 28px; border-radius: 50%; background: #1e3a6e; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+.rcname { font-weight: 700; font-size: 14px; }
+.rcdate { font-size: 11px; color: var(--dim); margin-left: auto; }
+.rcbody { font-size: 13px; line-height: 1.7; }
+.rcbody p { margin-bottom: 6px; }
+.rcbody strong { color: var(--dim); font-size: 11px; display: block; margin-bottom: 2px; }
+.ract { display: flex; gap: 8px; align-items: center; padding-top: 10px; margin-top: 10px; border-top: 1px solid var(--border); }
+.lkbtn { background: none; border: 1px solid var(--border); border-radius: 20px; padding: 4px 10px; cursor: pointer; font-size: 12px; color: var(--dim); display: flex; align-items: center; gap: 4px; font-family: inherit; }
+.lkbtn.liked { background: #1e3a6e; color: #fff; border-color: #1e3a6e; }
+.cmtbtn { background: none; border: none; color: var(--dim); cursor: pointer; font-size: 12px; font-family: inherit; }
+.cmtbtn:hover { color: var(--text); }
+.cmts { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+.cmt { font-size: 12px; margin-bottom: 5px; display: flex; gap: 5px; }
+.cma { font-weight: 700; white-space: nowrap; }
+.cmtinp { display: flex; gap: 6px; margin-top: 8px; }
+.cmtinp input { flex: 1; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; font-family: inherit; background: var(--surface2); }
+.cmtinp input:focus { outline: none; border-color: var(--text); }
+.cmtinp button { padding: 6px 12px; background: #1e3a6e; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-family: inherit; }
+
+/* ===== RANKING ===== */
+.rktabs { display: flex; gap: 5px; margin-bottom: 14px; flex-wrap: wrap; }
+.rktab { padding: 4px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 20px; cursor: pointer; font-size: 12px; color: var(--dim); font-family: inherit; }
+.rktab.active { background: #1e3a6e; color: #fff; border-color: #1e3a6e; }
+.rkl { display: flex; flex-direction: column; gap: 6px; }
+.rkitem { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 12px 16px; display: flex; align-items: center; gap: 12px; }
+.rkitem.me { border-color: #1e3a6e; border-width: 2px; }
+.rkbadge { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 14px; flex-shrink: 0; font-family: 'Courier New', monospace; }
+.rkbadge.gold { background: var(--gold); color: #fff; }
+.rkbadge.silver { background: var(--silver); color: #fff; }
+.rkbadge.bronze { background: var(--bronze); color: #fff; }
+.rkbadge.other { background: var(--surface2); color: var(--dim); }
+.rkin { flex: 1; }
+.rkname { font-weight: 700; font-size: 14px; margin-bottom: 2px; }
+.rkscore { font-size: 20px; font-weight: 900; font-family: 'Courier New', monospace; }
+.rkunit { font-size: 11px; color: var(--dim); margin-left: 3px; }
+
+/* ===== SHIFT ===== */
+.wnav { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.wnav button { background: var(--surface); border: 1px solid var(--border); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-family: inherit; font-size: 13px; }
+.wnav span { font-size: 14px; font-weight: 700; }
+.sw { overflow-x: auto; }
+.stbl { width: 100%; border-collapse: collapse; background: var(--surface); min-width: 600px; }
+.stbl th { background: var(--surface2); padding: 8px 10px; text-align: center; font-size: 12px; color: var(--dim); font-weight: 700; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.stbl td { padding: 6px 8px; font-size: 13px; border-bottom: 1px solid var(--border); text-align: center; }
+.stbl .ucol { text-align: left; font-weight: 700; white-space: nowrap; }
+.stbl tr:last-child td { border-bottom: none; }
+.sinp { width: 100%; padding: 4px 6px; border: 1px solid var(--border); border-radius: 5px; font-size: 12px; font-family: inherit; text-align: center; background: var(--surface2); }
+.sinp:focus { outline: none; border-color: var(--text); }
+.sinp:disabled { opacity: .4; cursor: not-allowed; background: transparent; border-color: transparent; }
+
+/* ===== MYPAGE ===== */
+.mpgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.mpcard { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 14px; }
+.mpcard.full { grid-column: 1 / -1; }
+.mpsec { font-size: 11px; font-weight: 700; color: var(--dim); margin-bottom: 10px; letter-spacing: .05em; text-transform: uppercase; }
+.mprow { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.mprow:last-child { border-bottom: none; }
+.mplbl { color: var(--dim); }
+.mpval { font-weight: 700; font-family: 'Courier New', monospace; }
+.prob-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
+.prob-card { background: var(--surface2); border-radius: var(--r); padding: 12px; text-align: center; }
+.prob-lbl { font-size: 11px; color: var(--dim); margin-bottom: 6px; }
+.prob-val { font-size: 24px; font-weight: 900; font-family: 'Courier New', monospace; }
+.prob-sub { font-size: 11px; color: var(--dim); margin-top: 3px; }
+.prob-bar { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; margin-top: 8px; }
+.prob-fill { height: 100%; background: #1e3a6e; }
+.histcard { background: var(--surface2); border-radius: var(--r); padding: 10px 12px; margin-bottom: 6px; }
+.histtitle { font-size: 13px; font-weight: 700; margin-bottom: 5px; }
+.histstats { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--dim); }
+.histstats strong { color: var(--text); }
+
+/* ===== ADMIN ===== */
+.aform { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 14px; margin-bottom: 14px; }
+.aform h3 { font-size: 13px; color: var(--dim); margin-bottom: 10px; }
+.irow { display: flex; gap: 8px; flex-wrap: wrap; }
+.irow input, .irow select { flex: 1; min-width: 100px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; font-family: inherit; background: var(--surface2); }
+.irow input:focus, .irow select:focus { outline: none; border-color: var(--text); }
+.ulist { display: flex; flex-direction: column; gap: 8px; }
+.urow { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 10px 14px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.urow-av { width: 32px; height: 32px; border-radius: 50%; background: #1e3a6e; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+.urow-info { flex: 1; min-width: 80px; }
+.urow-name { font-weight: 700; font-size: 14px; }
+.rtag { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 700; margin-top: 2px; }
+.rtag.admin { background: #fff8e1; color: var(--gold); border: 1px solid var(--gold); }
+.rtag.leader { background: #f0f0f0; color: var(--dim); border: 1px solid var(--border); }
+.rtag.member { background: var(--surface2); color: var(--dim); }
+.urow-acts { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.urow-acts input { width: 90px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 5px; font-size: 13px; font-family: inherit; background: var(--surface2); }
+.urow-acts select { padding: 5px 8px; border: 1px solid var(--border); border-radius: 5px; font-size: 13px; font-family: inherit; background: var(--surface2); }
+.citem-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.citem-tag { display: flex; align-items: center; gap: 4px; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; }
+.citem-tag input { border: none; background: transparent; font-size: 12px; font-family: inherit; width: 90px; color: var(--text); }
+.citem-tag input:focus { outline: none; }
+.citem-tag button { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 13px; line-height: 1; }
+
+/* ===== MEDIA ===== */
+@media (max-width: 600px) {
+  .cgrid { grid-template-columns: repeat(3, 1fr); }
+  .mpgrid { grid-template-columns: 1fr; }
+  .kgrid { grid-template-columns: 1fr; }
+  .hteam { display: none; }
+  .prob-grid { grid-template-columns: repeat(2, 1fr); }
+  .tc { padding: 10px; }
+  .hdr { padding: 8px 10px; }
+  .hlogo { font-size: 13px; }
+  .mnav span { font-size: 12px; min-width: 55px; }
+  .mnav { padding: 3px 5px; }
+  .ntab { min-width: 52px; font-size: 9px; padding: 7px 2px; }
+  .ntab .ico { font-size: 14px; }
+  .sec-title { font-size: 13px; }
+  .btn { padding: 10px 12px; font-size: 13px; }
+  .citem { padding: 10px 5px; }
+  .cicnt { font-size: 1.6rem; }
+  .cilbl { font-size: 10px; }
+  .dt { min-width: 320px; font-size: 11px; }
+  .dt th { padding: 5px 6px; font-size: 10px; }
+  .dt td { padding: 5px 6px; font-size: 11px; }
+  .stbl { min-width: 400px; }
+  .rkitem { padding: 10px 12px; gap: 10px; }
+  .rkscore { font-size: 1.1rem; }
+  .mpcard { padding: 10px; }
+  .mpsec { font-size: 10px; }
+  .mprow { font-size: 12px; }
+  .mpval { font-size: 12px; }
+  .prob-card { padding: 8px; }
+  .prob-val { font-size: 1.4rem; }
+  .histcard { padding: 8px 10px; }
+  .histstats { gap: 6px; font-size: 11px; }
+  .rform { padding: 10px; }
+  .rcard { padding: 10px; }
+  .aform { padding: 10px; }
+  .irow { gap: 6px; }
+  .urow { padding: 8px 10px; gap: 8px; }
+  .cact { padding: 10px; gap: 6px; }
+  /* カレンダー縦画面 */
+  .cal-grid { grid-template-columns: repeat(7, 1fr); }
+  .cal-day { min-height: 44px; font-size: 10px; }
+  /* スプレッドシート縦画面 */
+  .sheet-tabs { flex-wrap: nowrap; overflow-x: auto; }
+}
+
+/* ===== CALENDAR ===== */
+.cal-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.cal-header span { font-size: 15px; font-weight: 700; }
+.cal-header button { background: var(--surface); border: 1px solid var(--border); padding: 5px 12px; border-radius: 6px; cursor: pointer; font-family: inherit; font-size: 13px; }
+.cal-dow { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-bottom: 2px; }
+.cal-dow span { text-align: center; font-size: 11px; color: var(--dim); font-weight: 700; padding: 4px 0; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.cal-day { min-height: 56px; background: var(--surface); border: 1px solid var(--border); border-radius: 5px; padding: 3px 4px; font-size: 11px; position: relative; }
+.cal-day.other-month { opacity: .4; }
+.cal-day.today { border-color: #1e3a6e; border-width: 2px; }
+.cal-day .cal-num { font-size: 11px; font-weight: 700; margin-bottom: 2px; color: var(--text); }
+.cal-day .cal-num.sun { color: #cc0000; }
+.cal-day .cal-num.sat { color: #1e3a6e; }
+.cal-day .cal-shift { font-size: 10px; color: #1e3a6e; font-weight: 600; background: #eef2f7; border-radius: 3px; padding: 1px 3px; margin-top: 1px; display: block; }
+.cal-day .cal-shift-me { font-size: 10px; cursor: pointer; }
+.cal-shift-input { display: none; }
+.cal-tap-btns { display: flex; flex-direction: column; gap: 2px; margin-top: 2px; }
+.cal-tap-btn { width: 100%; padding: 2px 0; font-size: 10px; font-weight: 700; border: none; border-radius: 3px; cursor: pointer; font-family: inherit; text-align: center; }
+.cal-tap-btn.shukkin { background: #1e3a6e; color: #fff; }
+.cal-tap-btn.kyuuka { background: #e8edf5; color: #7a8aaa; }
+.cal-tap-btn.clear { background: #fff0f0; color: #cc0000; font-size: 9px; }
+.cal-day .cal-status { font-size: 11px; font-weight: 700; text-align: center; margin-top: 2px; padding: 2px 0; border-radius: 3px; }
+.cal-day .cal-status.shukkin { background: #1e3a6e; color: #fff; }
+.cal-day .cal-status.kyuuka { background: #e8edf5; color: #7a8aaa; }
+.cal-day .cal-status.jikan { background: #1e3a6e; color: #fff; font-size: 9px; line-height: 1.3; }
+/* 時間入力モーダル */
+.time-modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+.time-modal { background: var(--surface); border-radius: 14px; padding: 24px 20px; width: 90%; max-width: 320px; box-shadow: 0 8px 32px rgba(0,0,0,.2); }
+.time-modal h3 { font-size: 15px; font-weight: 700; margin-bottom: 16px; color: var(--text); text-align: center; }
+.time-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.time-row label { font-size: 13px; color: var(--dim); width: 40px; flex-shrink: 0; }
+.time-row input[type=time] { flex: 1; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 15px; font-family: inherit; background: var(--surface2); }
+.time-row input[type=time]:focus { outline: none; border-color: #1e3a6e; }
+.time-modal-btns { display: flex; gap: 8px; margin-top: 16px; }
+.time-modal-btns button { flex: 1; padding: 11px; border: none; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; }
+.tm-ok { background: #1e3a6e; color: #fff; }
+.tm-rest { background: #e8edf5; color: #7a8aaa; }
+.tm-cancel { background: var(--surface2); color: var(--dim); }
+/* 保存ボタン強調 */
+.shift-save-bar { position: sticky; bottom: 0; background: var(--bg); padding: 10px 0; margin-top: 12px; border-top: 2px solid #1e3a6e; }
+.shift-save-btn { width: 100%; padding: 14px; background: #1e3a6e; color: #fff; border: none; border-radius: var(--r); font-size: 16px; font-weight: 900; cursor: pointer; font-family: inherit; letter-spacing: .05em; }
+.shift-save-btn:active { opacity: .8; }
+.cal-legend { display: flex; gap: 10px; margin-top: 8px; font-size: 11px; color: var(--dim); flex-wrap: wrap; }
+/* ===== SPREADSHEET ===== */
+.sheet-wrap { overflow: hidden; }
+.sheet-tabs { display: flex; gap: 4px; margin-bottom: 0; overflow-x: auto; padding-bottom: 0; }
+.sheet-tab { padding: 6px 14px; background: var(--surface2); border: 1px solid var(--border); border-bottom: none; border-radius: 6px 6px 0 0; cursor: pointer; font-size: 12px; color: var(--dim); font-family: inherit; white-space: nowrap; }
+.sheet-tab.active { background: var(--surface); color: var(--text); font-weight: 700; border-bottom: 1px solid var(--surface); position: relative; z-index: 1; }
+.sheet-body { background: var(--surface); border: 1px solid var(--border); border-radius: 0 6px 6px 6px; overflow-x: auto; padding: 10px; }
+.sheet-table { width: 100%; border-collapse: collapse; min-width: 400px; }
+.sheet-table th { background: #1e3a6e; color: #fff; padding: 6px 8px; text-align: center; font-size: 11px; white-space: nowrap; }
+.sheet-table td { padding: 5px 8px; font-size: 11px; border-bottom: 1px solid var(--border); text-align: center; white-space: nowrap; }
+.sheet-table tr:last-child td { border-bottom: none; }
+.sheet-table .name-col { text-align: left; font-weight: 700; background: #eef2f7; }
+.sheet-rate { font-weight: 700; }
+.sheet-rate.good { color: #006600; }
+.sheet-rate.bad { color: #cc0000; }
+/* ===== TEAM TOTAL BANNER ===== */
+.team-total-banner { background: linear-gradient(135deg, #1e3a6e, #2d5a9e); color: #fff; border-radius: 10px; padding: 12px 16px; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; }
+.team-total-label { font-size: 12px; opacity: .8; }
+.team-total-score { font-size: 28px; font-weight: 900; font-family: "Courier New", monospace; }
+.team-total-unit { font-size: 13px; opacity: .8; margin-left: 4px; }
+/* ===== FORECAST ===== */
+.forecast-card { background: linear-gradient(135deg, #eef2f7, #dde6f5); border: 1px solid #c0d0e8; border-radius: 8px; padding: 10px 14px; margin-top: 8px; }
+.forecast-label { font-size: 11px; color: #1e3a6e; font-weight: 700; margin-bottom: 4px; }
+.forecast-val { font-size: 20px; font-weight: 900; font-family: "Courier New", monospace; color: #1e3a6e; }
+.forecast-sub { font-size: 10px; color: var(--dim); margin-top: 2px; }
+</style>
+</head>
+<body>
+<div id="root">
+  <div class="loading"><div class="spin"></div>読み込み中...</div>
+</div>
+
+<script>
+// ============================================================
+// CONSTANTS
+// ============================================================
+const SB_URL = 'https://igljifdtbuqsllnobhua.supabase.co';
+const SB_KEY = 'sb_publishable_pkB-LnYPblgmo6KJsb52uQ_oSej-zGx';
+const SESSION_KEY = 'elan_session';
+
+const DEFAULT_CITEMS = ['ピンポン数','対応数','対面数','モデム機','無料・未利用','おやかん','フルトーク','玄関in','契約数','不出・返却','キャッチ数','キャッチから対面数','電気確認','電気獲得','ガス獲得','水提案','水獲得'];
+const DEFAULT_PRODS = [
+  {key:'au_hikari', name:'au光', points:4},
+  {key:'au_electric', name:'au電気', points:2},
+  {key:'cosmo_water', name:'コスモウォーター', points:3}
+];
+const ROLES = {admin:'管理者', leader:'リーダー', member:'メンバー'};
+const DAYS = ['日','月','火','水','木','金','土'];
+const RANK_COUNTER_ITEMS = ['ピンポン数','対応数','対面数','フルトーク'];
+const MP_COUNTER_ITEMS = ['ピンポン数','対応数','対面数','フルトーク','電気獲得','ガス獲得','水獲得'];
+const PROB_CHAINS = [
+  {from:'ピンポン数', to:'対応数', label:'PP→対応率'},
+  {from:'対応数', to:'対面数', label:'対応→対面率'},
+  {from:'対面数', to:'モデム機', label:'対面→モデム率'},
+  {from:'モデム機', to:'フルトーク', label:'モデム→FT率'},
+  {from:'フルトーク', to:'契約数', label:'FT→契約率'},
+  {from:'対面数', to:'電気確認', label:'対面→電気確認率'}
+];
+
+// ============================================================
+// STATE
+// ============================================================
+var ST = {
+  teamId: null, teamName: null, user: null,
+  tab: 'counter',
+  month: new Date().toISOString().slice(0,7),
+  shiftWeek: null,
+  pView: 'company', pGran: 'month',
+  rType: 'daily', rkType: 'total',
+  users: {}, counters: {}, progress: {}, reports: {daily:{}, weekly:{}}, kpis: {}, shifts: {}, settings: null, documents: [],
+  tempCnt: null, mode: null
+};
+var CITEMS = DEFAULT_CITEMS.slice();
+var PRODS = DEFAULT_PRODS.map(function(p){ return Object.assign({}, p); });
+
+// ============================================================
+// SUPABASE
+// ============================================================
+var DB = null;
+function initDB() {
+  DB = supabase.createClient(SB_URL, SB_KEY);
+}
+
+function dbGet(table, filterObj) {
+  var q = DB.from(table).select('*');
+  if (filterObj) {
+    Object.keys(filterObj).forEach(function(k) { q = q.eq(k, filterObj[k]); });
+  }
+  return q.then(function(res) { return res.data || []; });
+}
+
+function dbGetMonth(table, month, dateCol) {
+  var next = nextMonth(month);
+  return DB.from(table).select('*')
+    .eq('team_id', ST.teamId)
+    .gte(dateCol, month + '-01')
+    .lt(dateCol, next + '-01')
+    .then(function(res) { return res.data || []; });
+}
+
+function dbGetMonths(table, months) {
+  return DB.from(table).select('*')
+    .eq('team_id', ST.teamId)
+    .in('month', months)
+    .then(function(res) { return res.data || []; });
+}
+
+function dbUpsert(table, row) {
+  return DB.from(table).upsert(row, {onConflict:'id'}).then(function(res) {
+    if (res.error) console.error('upsert error', res.error);
+  });
+}
+
+function dbInsert(table, row) {
+  return DB.from(table).insert(row).then(function(res) {
+    if (res.error) console.error('insert error', res.error);
+  });
+}
+
+function dbUpdateRow(table, rowId, updates) {
+  return DB.from(table).update(updates).eq('id', rowId).then(function(res) {
+    if (res.error) console.error('update error', res.error);
+  });
+}
+
+// ============================================================
+// DATE HELPERS
+// ============================================================
+function todayStr() { return new Date().toISOString().split('T')[0]; }
+function nextMonth(m) {
+  var parts = m.split('-');
+  var y = parseInt(parts[0]);
+  var mo = parseInt(parts[1]);
+  var d = new Date(y, mo, 1);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+}
+function addDays(s, n) {
+  var d = new Date(s);
+  d.setDate(d.getDate() + n);
+  return d.toISOString().split('T')[0];
+}
+function mondayOf(s) {
+  var d = new Date(s || todayStr());
+  var day = d.getDay();
+  var diff = (day === 0) ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().split('T')[0];
+}
+function weekDates(ws) {
+  var out = [];
+  for (var i = 0; i < 7; i++) out.push(addDays(ws, i));
+  return out;
+}
+function fmtDate(s) {
+  var d = new Date(s);
+  return (d.getMonth()+1) + '/' + d.getDate() + '(' + DAYS[d.getDay()] + ')';
+}
+function recentMonths(base, n) {
+  var out = [];
+  for (var i = 0; i < n; i++) {
+    var parts = base.split('-');
+    var y = parseInt(parts[0]);
+    var mo = parseInt(parts[1]);
+    var d = new Date(y, mo-1-i, 1);
+    out.push(d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'));
+  }
+  return out;
+}
+function yyyymmdd(s) { return s.replace(/-/g,''); }
+
+// ============================================================
+// TOAST
+// ============================================================
+function toast(msg, isErr) {
+  var el = document.createElement('div');
+  el.className = 'toast' + (isErr ? ' err' : '');
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 2600);
+}
+
+// ============================================================
+// SESSION
+// ============================================================
+function saveSession() {
+  if (!ST.user || !ST.teamId) return;
+  localStorage.setItem(SESSION_KEY, JSON.stringify({user: ST.user, teamId: ST.teamId, teamName: ST.teamName}));
+}
+function clearSession() { localStorage.removeItem(SESSION_KEY); }
+function loadSession() {
+  try { var s = localStorage.getItem(SESSION_KEY); return s ? JSON.parse(s) : null; } catch(e) { return null; }
+}
+
+// ============================================================
+// LOAD DATA
+// ============================================================
+function loadData() {
+  var months = recentMonths(ST.month, 4);
+  return Promise.all([
+    dbGet('users', {team_id: ST.teamId}),
+    dbGetMonths('progress', months),
+    dbGetMonth('counters', ST.month, 'date'),
+    dbGetMonth('reports', ST.month, 'date'),
+    dbGet('kpis', {team_id: ST.teamId}),
+    dbGet('shifts', {team_id: ST.teamId}),
+    dbGet('team_settings', {team_id: ST.teamId})
+  ]).then(function(results) {
+    applyData(results[0], results[1], results[2], results[3], results[4], results[5], results[6]);
+  });
+}
+
+function applyData(users, progress, counters, reports, kpis, shifts, settings) {
+  ST.users = {};
+  users.forEach(function(u) { ST.users[u.id] = u; });
+
+  ST.progress = {};
+  progress.forEach(function(p) {
+    if (!ST.progress[p.user_id]) ST.progress[p.user_id] = {};
+    ST.progress[p.user_id][p.month] = p.data || {};
+    ST.progress[p.user_id][p.month]._rowId = p.id;
+  });
+
+  ST.counters = {};
+  counters.forEach(function(c) {
+    var key = c.user_id + '_' + c.date;
+    ST.counters[key] = c.data || {};
+    ST.counters[key]._rowId = c.id;
+  });
+
+  ST.reports = {daily:{}, weekly:{}};
+  reports.forEach(function(r) {
+    var t = r.type;
+    if (!ST.reports[t]) ST.reports[t] = {};
+    ST.reports[t][r.id] = {
+      id: r.id, userId: r.user_id, userName: r.user_name,
+      type: r.type, date: r.created_at || r.date,
+      achievements: r.achievements, learnings: r.learnings,
+      improvements: r.improvements, freeText: r.free_text,
+      likes: r.likes || [], comments: r.comments || []
+    };
+  });
+
+  ST.kpis = {};
+  kpis.forEach(function(k) {
+    ST.kpis[k.user_id] = k.data || {};
+    ST.kpis[k.user_id]._rowId = k.id;
+  });
+
+  ST.shifts = {};
+  shifts.forEach(function(s) {
+    var key = s.user_id + '_' + s.week_start;
+    ST.shifts[key] = s.data || {};
+    ST.shifts[key]._rowId = s.id;
+  });
+
+  // Apply team settings
+  CITEMS = DEFAULT_CITEMS.slice();
+  PRODS = DEFAULT_PRODS.map(function(p) { return Object.assign({}, p); });
+  if (settings && settings.length) {
+    var ts = settings[0];
+    ST.settings = ts;
+    if (ts.counter_items && ts.counter_items.length) CITEMS = ts.counter_items.slice();
+    if (ts.products && ts.products.length) PRODS = ts.products.map(function(p) { return Object.assign({}, p); });
+  } else {
+    ST.settings = null;
+  }
+}
+
+function reloadMonth() {
+  var months = recentMonths(ST.month, 4);
+  return Promise.all([
+    dbGetMonths('progress', months),
+    dbGetMonth('counters', ST.month, 'date'),
+    dbGetMonth('reports', ST.month, 'date')
+  ]).then(function(results) {
+    ST.progress = {};
+    results[0].forEach(function(p) {
+      if (!ST.progress[p.user_id]) ST.progress[p.user_id] = {};
+      ST.progress[p.user_id][p.month] = p.data || {};
+      ST.progress[p.user_id][p.month]._rowId = p.id;
+    });
+    ST.counters = {};
+    results[1].forEach(function(c) {
+      var key = c.user_id + '_' + c.date;
+      ST.counters[key] = c.data || {};
+      ST.counters[key]._rowId = c.id;
+    });
+    ST.reports = {daily:{}, weekly:{}};
+    results[2].forEach(function(r) {
+      var t = r.type;
+      if (!ST.reports[t]) ST.reports[t] = {};
+      ST.reports[t][r.id] = {
+        id: r.id, userId: r.user_id, userName: r.user_name,
+        type: r.type, date: r.created_at || r.date,
+        achievements: r.achievements, learnings: r.learnings,
+        improvements: r.improvements, freeText: r.free_text,
+        likes: r.likes || [], comments: r.comments || []
+      };
+    });
+  });
+}
+
+// ============================================================
+// RENDER ENGINE
+// ============================================================
+function setHTML(html) { document.getElementById('root').innerHTML = html; }
+function reTab() {
+  var el = document.getElementById('tab-area');
+  if (el) { el.innerHTML = renderTab(); bindTab(); }
+}
+function render() {
+  if (!ST.user) { setHTML(renderLogin()); bindLogin(); }
+  else if (!ST.mode) { setHTML(renderModeSelect()); bindModeSelect(); }
+  else { setHTML(renderApp()); bindTab(); }
+}
+
+// ============================================================
+// MODE SELECT（ログイン後のモード選択）
+// ============================================================
+function renderModeSelect() {
+  var u = ST.user;
+  return '<div class="mode-wrap">' +
+    '<div class="mode-logo">' +
+    '<h1>ÉLAN Groupe営業管理</h1>' +
+    '<div class="sub">Sales Visit Manager</div>' +
+    '</div>' +
+    '<div class="mode-user">ようこそ、<span>' + u.name + '</span> さん</div>' +
+    '<div class="mode-grid">' +
+    '<div class="mode-card active-card" onclick="selectVisitMode()">' +
+    '<div class="mc-ico">🏠</div>' +
+    '<div class="mc-title">訪問販売</div>' +
+    '<div class="mc-sub">カウンター・進捗・<br>日報・ランキング</div>' +
+    '</div>' +
+    '<div class="mode-card disabled">' +
+    '<div class="mode-badge coming">準備中</div>' +
+    '<div class="mc-ico">🎪</div>' +
+    '<div class="mc-title">催事</div>' +
+    '<div class="mc-sub">Coming Soon</div>' +
+    '</div>' +
+    '</div>' +
+    '<button class="mode-logout" onclick="doLogout()">ログアウト</button>' +
+    '<div class="mode-footer" style="margin-top:12px">© ÉLAN Groupe営業管理</div>' +
+    '</div>';
+}
+
+function bindModeSelect() {}
+
+function selectVisitMode() { selectMode('visit'); }
+function selectMode(mode) {
+  ST.mode = mode;
+  ST.tab = 'counter';
+  setHTML(renderApp());
+  bindTab();
+}
+
+// ============================================================
+// LOGIN
+// ============================================================
+function renderLogin() {
+  return '<div class="lw"><div class="lb">' +
+    '<div class="ll"><h1>ÉLAN Groupe営業管理</h1><div class="sub">Sales Visit Manager</div></div>' +
+    '<div id="ls-team">' +
+    '<div class="fg"><label>チームコード</label><input type="text" id="l-code" placeholder="チームコードを入力"/></div>' +
+    '<button class="lbtn" id="l-next-btn">次へ →</button>' +
+    '<div class="lerr" id="l-err1"></div>' +
+    '<div class="llink"><a onclick="showCreate()">新しいチームを作成する</a></div>' +
+    '</div>' +
+    '<div id="ls-user" style="display:none">' +
+    '<div class="tbadge" id="l-tbadge"></div>' +
+    '<div class="fg"><label>名前を選択</label><select id="l-user"><option value="">選択してください</option></select></div>' +
+    '<div class="fg"><label>パスワード</label><input type="password" id="l-pass" placeholder="パスワード"/></div>' +
+    '<button class="lbtn" id="l-login-btn">ログイン</button>' +
+    '<div class="lerr" id="l-err2"></div>' +
+    '<div class="llink"><a onclick="backTeam()">← 戻る</a></div>' +
+    '</div>' +
+    '<div id="ls-create" style="display:none">' +
+    '<div class="fg"><label>チーム名</label><input type="text" id="c-name" placeholder="例: 田中チーム"/></div>' +
+    '<div class="fg"><label>チームコード（メンバーに共有するコード）</label><input type="text" id="c-code" placeholder="例: tanaka2024"/></div>' +
+    '<div class="fg"><label>管理者の名前</label><input type="text" id="c-admin" placeholder="管理者の名前"/></div>' +
+    '<div class="fg"><label>管理者パスワード（6文字以上）</label><input type="password" id="c-pass" placeholder="パスワード"/></div>' +
+    '<button class="lbtn" id="c-create-btn">チームを作成</button>' +
+    '<div class="lerr" id="c-err"></div>' +
+    '<div class="llink"><a onclick="backTeam()">← 戻る</a></div>' +
+    '</div>' +
+    '</div></div>';
+}
+
+function bindLogin() {
+  var nb = document.getElementById('l-next-btn');
+  if (nb) nb.addEventListener('click', loginNext);
+  var lb = document.getElementById('l-login-btn');
+  if (lb) lb.addEventListener('click', loginUser);
+  var cb = document.getElementById('c-create-btn');
+  if (cb) cb.addEventListener('click', createTeam);
+  var lp = document.getElementById('l-pass');
+  if (lp) lp.addEventListener('keydown', function(e) { if (e.key === 'Enter') loginUser(); });
+}
+function showCreate() {
+  document.getElementById('ls-team').style.display = 'none';
+  document.getElementById('ls-create').style.display = 'block';
+}
+function backTeam() {
+  document.getElementById('ls-team').style.display = 'block';
+  document.getElementById('ls-user').style.display = 'none';
+  document.getElementById('ls-create').style.display = 'none';
+}
+function loginNext() {
+  var code = document.getElementById('l-code').value.trim();
+  if (!code) return;
+  var tid = 'team_' + code;
+  dbGet('teams', {id: tid}).then(function(rows) {
+    if (!rows.length) {
+      showErr('l-err1', 'チームが見つかりません');
+      return;
+    }
+    ST.teamId = rows[0].id;
+    ST.teamName = rows[0].team_name;
+    return dbGet('users', {team_id: ST.teamId}).then(function(users) {
+      var sel = document.getElementById('l-user');
+      sel.innerHTML = '<option value="">選択してください</option>';
+      users.forEach(function(u) {
+        var opt = document.createElement('option');
+        opt.value = u.id;
+        opt.textContent = u.name;
+        sel.appendChild(opt);
+      });
+      document.getElementById('l-tbadge').textContent = ST.teamName;
+      document.getElementById('ls-team').style.display = 'none';
+      document.getElementById('ls-user').style.display = 'block';
+    });
+  });
+}
+function loginUser() {
+  var uid = document.getElementById('l-user').value;
+  var pass = document.getElementById('l-pass').value;
+  if (!uid || !pass) { showErr('l-err2', '名前とパスワードを入力してください'); return; }
+  dbGet('users', {id: uid, team_id: ST.teamId}).then(function(rows) {
+    if (!rows.length || rows[0].password !== pass) {
+      showErr('l-err2', 'パスワードが違います');
+      return;
+    }
+    ST.user = rows[0];
+    ST.shiftWeek = mondayOf(todayStr());
+    saveSession();
+    setHTML('<div class="loading"><div class="spin"></div>データを読み込み中...</div>');
+    loadData().then(function() { render(); });
+  });
+}
+function createTeam() {
+  var tname = document.getElementById('c-name').value.trim();
+  var code = document.getElementById('c-code').value.trim();
+  var aname = document.getElementById('c-admin').value.trim();
+  var pass = document.getElementById('c-pass').value;
+  if (!tname || !code || !aname || !pass) { showErr('c-err', 'すべて入力してください'); return; }
+  if (pass.length < 6) { showErr('c-err', 'パスワードは6文字以上'); return; }
+  var tid = 'team_' + code;
+  dbGet('teams', {id: tid}).then(function(rows) {
+    if (rows.length) { showErr('c-err', 'このコードは既に使われています'); return; }
+    var uid = 'user_' + Date.now();
+    var admin = {id: uid, team_id: tid, name: aname, role: 'admin', password: pass};
+    return dbInsert('teams', {id: tid, team_name: tname})
+      .then(function() { return dbInsert('users', admin); })
+      .then(function() {
+        ST.teamId = tid; ST.teamName = tname; ST.user = admin;
+        ST.shiftWeek = mondayOf(todayStr());
+        saveSession();
+        return loadData();
+      }).then(function() { render(); toast('チームを作成しました！'); });
+  });
+}
+function showErr(id, msg) {
+  var el = document.getElementById(id);
+  if (el) { el.textContent = msg; el.style.display = 'block'; }
+}
+
+// ============================================================
+// APP SHELL
+// ============================================================
+function renderApp() {
+  var u = ST.user;
+  var parts = ST.month.split('-');
+  var yr = parts[0];
+  var mo = parseInt(parts[1]);
+  var tabs = [
+    {id:'counter', ico:'🔢', lbl:'カウンター'},
+    {id:'chist', ico:'📋', lbl:'履歴'},
+    {id:'progress', ico:'📈', lbl:'進捗管理'},
+    {id:'reports', ico:'📝', lbl:'日報・週報'},
+    {id:'ranking', ico:'🏆', lbl:'ランキング'},
+    {id:'shift', ico:'📅', lbl:'シフト'},
+    {id:'mypage', ico:'👤', lbl:'マイページ'}
+  ];
+  if (u.role === 'admin') tabs.push({id:'admin', ico:'⚙️', lbl:'管理'});
+
+  var navHtml = '';
+  tabs.forEach(function(t) {
+    navHtml += '<button class="ntab' + (ST.tab === t.id ? ' active' : '') + '" onclick="switchTab(\'' + t.id + '\')">' +
+      '<span class="ico">' + t.ico + '</span>' + t.lbl + '</button>';
+  });
+
+  return '<div class="app">' +
+    '<div class="hdr">' +
+    '<div style="display:flex;align-items:center"><span class="hlogo">ÉLAN Groupe営業管理</span><span class="hteam">' + (ST.teamName||'') + '</span></div>' +
+    '<div class="hright">' +
+    '<div class="mnav"><button onclick="chMonth(-1)">◀</button><span>' + yr + '年' + mo + '月</span><button onclick="chMonth(1)">▶</button></div>' +
+    '<div class="uinfo"><div class="uname">' + u.name + '</div><div class="urole">' + ROLES[u.role] + '</div></div>' +
+    '<button class="loutbtn" onclick="doLogout()">ログアウト</button>' +
+    '</div></div>' +
+    '<div class="nav">' + navHtml + '</div>' +
+    '<div class="tc" id="tab-area">' + renderTab() + '</div>' +
+    '</div>';
+}
+
+function switchTab(t) {
+  ST.tab = t;
+  document.querySelectorAll('.ntab').forEach(function(b) {
+    b.classList.toggle('active', b.textContent.trim().indexOf({counter:'カウンター',chist:'履歴',progress:'進捗管理',reports:'日報',ranking:'ランキング',shift:'シフト',mypage:'マイページ',admin:'管理'}[t]) >= 0);
+  });
+  reTab();
+}
+
+function chMonth(delta) {
+  var parts = ST.month.split('-');
+  var y = parseInt(parts[0]); var m = parseInt(parts[1]);
+  var d = new Date(y, m-1+delta, 1);
+  ST.month = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+  var hdr = document.querySelector('.mnav span');
+  if (hdr) hdr.textContent = d.getFullYear() + '年' + (d.getMonth()+1) + '月';
+  setHTML('<div class="loading"><div class="spin"></div>読み込み中...</div>');
+  reloadMonth().then(function() { render(); });
+}
+
+function doLogout() {
+  clearSession();
+  ST.user = null; ST.teamId = null; ST.tab = 'counter'; ST.tempCnt = null; ST.mode = null;
+  render();
+}
+
+function renderTab() {
+  if (ST.tab === 'counter') return renderCounter();
+  if (ST.tab === 'chist') return renderChist();
+  if (ST.tab === 'progress') return renderProgress();
+  if (ST.tab === 'reports') return renderReports();
+  if (ST.tab === 'ranking') return renderRanking();
+  if (ST.tab === 'shift') return renderShift();
+  if (ST.tab === 'mypage') return renderMyPage();
+  if (ST.tab === 'admin') return renderAdmin();
+  return '';
+}
+function bindTab() {
+  if (ST.tab === 'counter') bindCounter();
+  else if (ST.tab === 'progress') bindProgress();
+  else if (ST.tab === 'reports') bindReports();
+  else if (ST.tab === 'shift') bindShift();
+  else if (ST.tab === 'admin') bindAdmin();
+}
+
+// ============================================================
+// COUNTER
+// ============================================================
+function cntKey() { return ST.user.id + '_' + todayStr(); }
+
+function renderCounter() {
+  var saved = ST.counters[cntKey()] || {};
+  if (!ST.tempCnt) {
+    ST.tempCnt = {};
+    CITEMS.forEach(function(item) { ST.tempCnt[item] = saved[item] || 0; });
+  }
+  var gridHtml = '';
+  CITEMS.forEach(function(item) {
+    var vid = 'cv_' + encodeURIComponent(item);
+    gridHtml += '<div class="citem" data-item="' + item + '">' +
+      '<div class="clbl">' + item + '</div>' +
+      '<div class="ccnt" id="' + vid + '">' + (ST.tempCnt[item]||0) + '</div>' +
+      '<div class="cht">長押しで−1</div>' +
+      '</div>';
+  });
+  return '<div class="ch"><h2>本日のカウント</h2><span class="cdate">' + new Date().toLocaleDateString('ja-JP') + '</span></div>' +
+    '<div class="cgrid">' + gridHtml + '</div>' +
+    '<div class="cact">' +
+    '<button class="btn btn-s" id="c-reset-btn" style="flex:1">リセット</button>' +
+    '<button class="btn btn-p" id="c-save-btn" style="flex:2">✓ 確定・保存</button>' +
+    '</div>';
+}
+
+function bindCounter() {
+  var pressTimer = null;
+  document.querySelectorAll('.citem').forEach(function(el) {
+    var item = el.getAttribute('data-item');
+    var vid = 'cv_' + encodeURIComponent(item);
+    function update() {
+      var el2 = document.getElementById(vid);
+      if (el2) el2.textContent = ST.tempCnt[item] || 0;
+    }
+    el.addEventListener('click', function() {
+      ST.tempCnt[item] = (ST.tempCnt[item] || 0) + 1;
+      update();
+    });
+    function dec() {
+      ST.tempCnt[item] = Math.max(0, (ST.tempCnt[item] || 0) - 1);
+      update();
+    }
+    el.addEventListener('mousedown', function() { pressTimer = setTimeout(dec, 500); });
+    el.addEventListener('mouseup', function() { clearTimeout(pressTimer); });
+    el.addEventListener('mouseleave', function() { clearTimeout(pressTimer); });
+    el.addEventListener('touchstart', function() { pressTimer = setTimeout(dec, 500); }, {passive:true});
+    el.addEventListener('touchend', function() { clearTimeout(pressTimer); });
+  });
+
+  var saveBtn = document.getElementById('c-save-btn');
+  if (saveBtn) saveBtn.addEventListener('click', function() {
+    var uid = ST.user.id;
+    var dt = todayStr();
+    var key = cntKey();
+    var rowId = ST.counters[key] ? ST.counters[key]._rowId : null;
+    var cid = rowId || ('cnt_' + uid + '_' + yyyymmdd(dt));
+    var data = Object.assign({}, ST.tempCnt);
+    dbUpsert('counters', {id: cid, team_id: ST.teamId, user_id: uid, date: dt, data: data}).then(function() {
+      var stored = Object.assign({}, data);
+      stored._rowId = cid;
+      ST.counters[key] = stored;
+      return syncCounterToProgress(uid, ST.month);
+    }).then(function() {
+      toast('カウントを確定しました！');
+    });
+  });
+
+  var resetBtn = document.getElementById('c-reset-btn');
+  if (resetBtn) resetBtn.addEventListener('click', function() {
+    if (!confirm('本日のカウントをリセットしますか？')) return;
+    ST.tempCnt = {};
+    CITEMS.forEach(function(item) { ST.tempCnt[item] = 0; });
+    reTab();
+  });
+}
+
+function syncCounterToProgress(uid, month) {
+  var totals = {};
+  CITEMS.forEach(function(i) { totals[i] = 0; });
+  Object.keys(ST.counters).forEach(function(key) {
+    if (key.indexOf(uid + '_') === 0) {
+      var dateStr = key.slice(uid.length + 1);
+      if (dateStr.indexOf(month) === 0) {
+        var val = ST.counters[key];
+        CITEMS.forEach(function(i) { totals[i] = (totals[i]||0) + (val[i]||0); });
+      }
+    }
+  });
+  if (!ST.progress[uid]) ST.progress[uid] = {};
+  var existing = ST.progress[uid][month] || {};
+  var rowId = existing._rowId;
+  var merged = Object.assign({}, existing, totals);
+  delete merged._rowId;
+  var pid = rowId || ('prog_' + uid + '_' + month.replace('-',''));
+  return dbUpsert('progress', {id: pid, team_id: ST.teamId, user_id: uid, month: month, data: merged}).then(function() {
+    merged._rowId = pid;
+    ST.progress[uid][month] = merged;
+  });
+}
+
+// ============================================================
+// COUNTER HISTORY
+// ============================================================
+function renderChist() {
+  var uid = ST.user.id;
+  var month = ST.month;
+  var showItems = ['ピンポン数','対応数','対面数','フルトーク','契約数','電気獲得','ガス獲得','水獲得'];
+  var days = [];
+  Object.keys(ST.counters).forEach(function(key) {
+    if (key.indexOf(uid + '_') === 0) {
+      var dt = key.slice(uid.length + 1);
+      if (dt.indexOf(month) === 0) days.push({date: dt, data: ST.counters[key]});
+    }
+  });
+  days.sort(function(a,b) { return b.date.localeCompare(a.date); });
+  if (!days.length) return '<h3 class="sec-title">📋 カウンター履歴 — ' + month.replace('-','年') + '月</h3><div class="empty"><div class="ei">📭</div><p>記録がありません</p></div>';
+  var html = '<h3 class="sec-title">📋 カウンター履歴 — ' + month.replace('-','年') + '月</h3><div class="hgrid">';
+  days.forEach(function(d) {
+    html += '<div class="hcard"><div class="hcdate">' + fmtDate(d.date) + '</div>';
+    showItems.forEach(function(item) {
+      html += '<div class="hrow"><span>' + item + '</span><span class="hval">' + (d.data[item]||0) + '</span></div>';
+    });
+    html += '</div>';
+  });
+  return html + '</div>';
+}
+
+// ============================================================
+// PROGRESS
+// ============================================================
+function canEdit(uid) {
+  var r = ST.user.role;
+  return r === 'admin' || r === 'leader' || ST.user.id === uid;
+}
+function totalElec(month) {
+  return Object.values(ST.users).reduce(function(s, u) {
+    var p = ST.progress[u.id] && ST.progress[u.id][month] ? ST.progress[u.id][month] : {};
+    return s + (p.electric || 0);
+  }, 0);
+}
+function calcPts(uid, month) {
+  var up = (ST.progress[uid] && ST.progress[uid][month]) ? ST.progress[uid][month] : {};
+  var te = totalElec(month);
+  return PRODS.reduce(function(s, p) {
+    var cnt = up[p.key] || 0;
+    if (p.key === 'electric') return s + cnt * (te >= (p.bonusThreshold||999) ? (p.bonusPoints||p.points) : p.points);
+    return s + cnt * p.points;
+  }, 0);
+}
+function getCounterByGran(uid, gran, month) {
+  var result = {};
+  Object.keys(ST.counters).forEach(function(key) {
+    if (key.indexOf(uid + '_') === 0) {
+      var dt = key.slice(uid.length + 1);
+      if (dt.indexOf(month) === 0) {
+        var bucket = gran === 'day' ? dt : mondayOf(dt);
+        if (!result[bucket]) result[bucket] = {};
+        var val = ST.counters[key];
+        CITEMS.forEach(function(i) { result[bucket][i] = (result[bucket][i]||0) + (val[i]||0); });
+      }
+    }
+  });
+  return result;
+}
+
+function renderProgress() {
+  var isAdmin = ST.user.role === 'admin';
+  var viewTabs = '<button class="stab' + (ST.pView==='company'?' active':'') + '" onclick="pvSwitch(\'company\')">社内管理</button>' +
+    '<button class="stab' + (ST.pView==='personal'?' active':'') + '" onclick="pvSwitch(\'personal\')">自己管理</button>' +
+    (isAdmin ? '<button class="stab' + (ST.pView==='admin_all'?' active':'') + '" onclick="pvSwitch(\'admin_all\')">全員確認</button>' : '');
+  var granTabs = '<span>表示単位:</span>' +
+    '<button class="gtab' + (ST.pGran==='day'?' active':'') + '" onclick="pgSwitch(\'day\')">日毎</button>' +
+    '<button class="gtab' + (ST.pGran==='week'?' active':'') + '" onclick="pgSwitch(\'week\')">週毎</button>' +
+    '<button class="gtab' + (ST.pGran==='month'?' active':'') + '" onclick="pgSwitch(\'month\')">月毎</button>';
+  return '<div class="stabs">' + viewTabs + '</div>' +
+    '<div class="gran-row">' + granTabs + '</div>' +
+    '<div id="pv-body">' + renderProgressBody() + '</div>';
+}
+function pvSwitch(v) { ST.pView = v; document.getElementById('pv-body').innerHTML = renderProgressBody(); bindProgress(); }
+function pgSwitch(g) { ST.pGran = g; document.querySelectorAll('.gtab').forEach(function(b) { b.classList.toggle('active', b.textContent === {day:'日毎',week:'週毎',month:'月毎'}[g]); }); document.getElementById('pv-body').innerHTML = renderProgressBody(); bindProgress(); }
+function renderProgressBody() {
+  if (ST.pView === 'company') return renderCompanyProg();
+  if (ST.pView === 'personal') return renderPersonalProg(ST.user.id);
+  if (ST.pView === 'admin_all') return renderAdminAll();
+  return '';
+}
+function renderCompanyProg() {
+  var month = ST.month;
+  var users = Object.values(ST.users);
+  var te = totalElec(month);
+
+  // チーム合計ポイント
+  var teamTotal = users.reduce(function(s, u) { return s + calcPts(u.id, month); }, 0);
+
+  // チーム終着予想（全メンバーの合計）
+  var today = new Date();
+  var teamWorked = 0;
+  var teamScheduled = 0;
+  users.forEach(function(u) {
+    var workedSet = {};
+    Object.keys(ST.counters).forEach(function(key) {
+      if (key.indexOf(u.id + '_') === 0) {
+        var dt = key.slice(u.id.length + 1);
+        if (dt.indexOf(month) === 0) workedSet[dt] = true;
+      }
+    });
+    teamWorked += Object.keys(workedSet).length;
+    Object.keys(ST.shifts).forEach(function(key) {
+      if (key.indexOf(u.id + '_') === 0) {
+        var sh = ST.shifts[key];
+        Object.keys(sh).forEach(function(d) {
+          if (d.indexOf(month) === 0 && sh[d] && sh[d] !== '休') {
+            if (new Date(d) > today) teamScheduled++;
+          }
+        });
+      }
+    });
+  });
+  var avgPerDay = teamWorked > 0 ? teamTotal / teamWorked : 0;
+  var teamForecast = teamTotal + avgPerDay * teamScheduled;
+
+  // バナー
+  var banner = '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">' +
+    '<div style="flex:1;min-width:160px;background:linear-gradient(135deg,#1e3a6e,#2d5a9e);border-radius:10px;padding:12px 16px;color:#fff;">' +
+    '<div style="font-size:11px;opacity:.8;margin-bottom:4px;">チーム合計ポイント（' + month.replace('-','年') + '月）</div>' +
+    '<div style="font-size:28px;font-weight:900;font-family:monospace;">' + teamTotal.toFixed(1) + '<span style="font-size:14px;font-weight:400;opacity:.8;margin-left:4px;">pt</span></div>' +
+    '</div>' +
+    '<div style="flex:1;min-width:160px;background:linear-gradient(135deg,#eef2f7,#dde6f5);border:1px solid #c0d0e8;border-radius:10px;padding:12px 16px;">' +
+    '<div style="font-size:11px;color:#1e3a6e;font-weight:700;margin-bottom:4px;">📊 チーム終着予想</div>' +
+    '<div style="font-size:28px;font-weight:900;font-family:monospace;color:#1e3a6e;">' + teamForecast.toFixed(1) + '<span style="font-size:14px;font-weight:400;color:var(--dim);margin-left:4px;">pt</span></div>' +
+    '<div style="font-size:10px;color:var(--dim);margin-top:2px;">平均' + avgPerDay.toFixed(1) + 'pt/日 × 残' + teamScheduled + '日分加算</div>' +
+    '</div>' +
+    '</div>';
+
+  if (ST.pGran === 'month') {
+    var html = banner + '<h3 class="sec-title">📊 ' + month.replace('-','年') + '月 社内進捗</h3><div class="tw"><table class="dt"><thead><tr><th>名前</th>';
+    PRODS.forEach(function(p) { html += '<th>' + p.name + '</th>'; });
+    html += '<th>合計pt</th></tr></thead><tbody>';
+    users.forEach(function(u) {
+      var up = (ST.progress[u.id] && ST.progress[u.id][month]) ? ST.progress[u.id][month] : {};
+      var tp = PRODS.reduce(function(s, p) {
+        var cnt = up[p.key]||0;
+        var pts = (p.key==='electric') ? cnt*(te>=(p.bonusThreshold||999)?(p.bonusPoints||p.points):p.points) : cnt*p.points;
+        return s + pts;
+      }, 0);
+      var ce = canEdit(u.id);
+      html += '<tr><td><strong>' + u.name + '</strong></td>';
+      PRODS.forEach(function(p) {
+        var cnt = up[p.key]||0;
+        var pts = (p.key==='electric') ? cnt*(te>=(p.bonusThreshold||999)?(p.bonusPoints||p.points):p.points) : cnt*p.points;
+        html += '<td>' + (ce ? '<input type="number" min="0" class="pi" data-uid="' + u.id + '" data-prod="' + p.key + '" value="' + cnt + '"/>' : '<span class="lck">' + cnt + '</span>') +
+          ' <span class="pts">(' + pts.toFixed(1) + ')</span></td>';
+      });
+      html += '<td class="pts">' + tp.toFixed(1) + 'pt</td></tr>';
+    });
+    return html + '</tbody></table></div>';
+  }
+  var showCols = ['ピンポン数','対応数','対面数','フルトーク','契約数'];
+  var allPeriods = {};
+  users.forEach(function(u) {
+    var g = getCounterByGran(u.id, ST.pGran, month);
+    Object.keys(g).forEach(function(p) { allPeriods[p] = true; });
+  });
+  var periods = Object.keys(allPeriods).sort();
+  if (!periods.length) return '<h3 class="sec-title">📊 ' + month.replace('-','年') + '月 社内進捗（' + {day:'日毎',week:'週毎'}[ST.pGran] + '）</h3><div class="empty"><div class="ei">📭</div><p>データがありません</p></div>';
+  var html = '<h3 class="sec-title">📊 ' + month.replace('-','年') + '月 社内進捗（' + {day:'日毎',week:'週毎'}[ST.pGran] + '）</h3>';
+  periods.forEach(function(period) {
+    var label = ST.pGran === 'week' ? fmtDate(period) + '〜' + fmtDate(addDays(period,6)) : fmtDate(period);
+    html += '<div style="margin-bottom:14px"><div style="font-size:12px;font-weight:700;color:var(--dim);padding:4px 8px;background:var(--surface2);border-radius:5px;margin-bottom:6px">' + label + '</div>';
+    html += '<div class="tw"><table class="dt"><thead><tr><th>名前</th>' + showCols.map(function(c) { return '<th>' + c + '</th>'; }).join('') + '</tr></thead><tbody>';
+    users.forEach(function(u) {
+      var g = getCounterByGran(u.id, ST.pGran, month);
+      var row = g[period] || {};
+      html += '<tr><td><strong>' + u.name + '</strong></td>' + showCols.map(function(c) { return '<td class="lck">' + (row[c]||0) + '</td>'; }).join('') + '</tr>';
+    });
+    html += '</tbody></table></div></div>';
+  });
+  return html;
+}
+function renderPersonalProg(uid) {
+  var month = ST.month;
+  var kpis = ST.kpis[uid] || {};
+  if (ST.pGran === 'month') {
+    var myCnts = {};
+    Object.keys(ST.counters).forEach(function(key) {
+      if (key.indexOf(uid + '_') === 0) {
+        var dt = key.slice(uid.length + 1);
+        if (dt.indexOf(month) === 0) {
+          var val = ST.counters[key];
+          CITEMS.forEach(function(i) { myCnts[i] = (myCnts[i]||0) + (val[i]||0); });
+        }
+      }
+    });
+    var html = '<h3 class="sec-title">🎯 ' + month.replace('-','年') + '月 自己KPI</h3><div class="kgrid">';
+    CITEMS.forEach(function(item) {
+      var target = (kpis[item] && kpis[item].target) ? kpis[item].target : 0;
+      var cur = myCnts[item] || 0;
+      var pct = target > 0 ? (cur / target * 100) : 0;
+      var disp = pct.toFixed(1);
+      var cls = pct >= 100 ? 'good' : pct < 70 ? 'bad' : '';
+      var barW = Math.min(pct, 100);
+      html += '<div class="kcard">' +
+        '<div class="klbl">' + item + '</div>' +
+        '<div class="krow"><span>目標:</span><input type="number" min="0" class="ki" data-item="' + item + '" data-uid="' + uid + '" value="' + target + '"/><span>実績:<strong>' + cur + '</strong></span></div>' +
+        '<div class="pb"><div class="pf ' + cls + '" style="width:' + barW + '%"></div></div>' +
+        '<div class="pp ' + cls + '">' + disp + '% ' + (pct>=100?'🎉':pct<70?'⚠️':'') + '</div>' +
+        '</div>';
+    });
+    return html + '</div>';
+  }
+  var g = getCounterByGran(uid, ST.pGran, month);
+  var periods = Object.keys(g).sort().reverse();
+  var label = {day:'日毎',week:'週毎'}[ST.pGran];
+  if (!periods.length) return '<h3 class="sec-title">🎯 ' + month.replace('-','年') + '月 自己（' + label + '）</h3><div class="empty"><div class="ei">📭</div><p>データがありません</p></div>';
+  var html = '<h3 class="sec-title">🎯 ' + month.replace('-','年') + '月 自己（' + label + '）</h3>';
+  periods.forEach(function(period) {
+    var row = g[period] || {};
+    var pl = ST.pGran === 'week' ? fmtDate(period) + '〜' + fmtDate(addDays(period,6)) : fmtDate(period);
+    html += '<div class="histcard"><div class="histtitle">' + pl + '</div><div class="histstats">' +
+      ['ピンポン数','対応数','対面数','フルトーク','契約数'].map(function(i) { return '<span>' + i + ': <strong>' + (row[i]||0) + '</strong></span>'; }).join('') +
+      '</div></div>';
+  });
+  return html;
+}
+var sheetTab = null;
+
+function renderAdminAll() {
+  var users = Object.values(ST.users);
+  if (!sheetTab) sheetTab = 'TEAM';
+  var month = ST.month;
+
+  // タブ
+  var tabsHtml = '<div class="sheet-tabs">';
+  var teamAct = (!sheetTab || sheetTab === 'TEAM') ? ' active' : '';
+  tabsHtml += '<button class="sheet-tab' + teamAct + '" onclick="switchSheetTab(\'TEAM\')">📊 チーム全体</button>';
+  users.forEach(function(u) {
+    var uAct = (sheetTab === u.id) ? ' active' : '';
+    tabsHtml += '<button class="sheet-tab' + uAct + '" onclick="switchSheetTab(\'' + u.id + '\')">' + u.name + '</button>';
+  });
+  tabsHtml += '</div>';
+
+  var bodyHtml = '';
+
+  if (!sheetTab || sheetTab === 'TEAM') {
+    // チーム全体シート
+    var te = totalElec(month);
+    bodyHtml = '<div class="sheet-body"><table class="sheet-table"><thead><tr><th class="name-col">名前</th>';
+    PRODS.forEach(function(p) { bodyHtml += '<th>' + p.name + '</th>'; });
+    bodyHtml += '<th>合計pt</th><th>達成率</th></tr></thead><tbody>';
+    users.forEach(function(u) {
+      var up = (ST.progress[u.id] && ST.progress[u.id][month]) ? ST.progress[u.id][month] : {};
+      var tp = calcPts(u.id, month);
+      var kpis = ST.kpis[u.id] || {};
+      // KPI目標の合計pt（簡易）
+      var targetPt = 0;
+      PRODS.forEach(function(p) { targetPt += (kpis[p.key] && kpis[p.key].target ? kpis[p.key].target : 0) * p.points; });
+      var rate = targetPt > 0 ? (tp / targetPt * 100).toFixed(1) : '-';
+      var rateCls = targetPt > 0 ? (tp/targetPt >= 1 ? 'good' : tp/targetPt < 0.7 ? 'bad' : '') : '';
+      bodyHtml += '<tr><td class="name-col">' + u.name + '</td>';
+      PRODS.forEach(function(p) { bodyHtml += '<td>' + (up[p.key]||0) + '</td>'; });
+      bodyHtml += '<td style="font-weight:700">' + tp.toFixed(1) + '</td>';
+      bodyHtml += '<td class="sheet-rate ' + rateCls + '">' + (rate !== '-' ? rate + '%' : '-') + '</td>';
+      bodyHtml += '</tr>';
+    });
+    bodyHtml += '</tbody></table></div>';
+  } else {
+    // 個人シート：日別カウンター記録 + 商材進捗 + 出勤予定 + 着地予想
+    var u = ST.users[sheetTab];
+    if (!u) { bodyHtml = '<div class="sheet-body"><p style="color:var(--dim);font-size:13px">ユーザーが見つかりません</p></div>'; }
+    else {
+      var showItems = ['ピンポン数','対応数','対面数','フルトーク','契約数'];
+      var myDays = [];
+      Object.keys(ST.counters).forEach(function(key) {
+        if (key.indexOf(u.id + '_') === 0) {
+          var dt = key.slice(u.id.length + 1);
+          if (dt.indexOf(month) === 0) myDays.push({date: dt, data: ST.counters[key]});
+        }
+      });
+      myDays.sort(function(a,b) { return a.date.localeCompare(b.date); });
+
+      // 合計
+      var totals = {};
+      showItems.forEach(function(i) { totals[i] = 0; });
+      myDays.forEach(function(d) { showItems.forEach(function(i) { totals[i] += (d.data[i]||0); }); });
+
+      // 商材進捗
+      var myProg = (ST.progress[u.id] && ST.progress[u.id][month]) ? ST.progress[u.id][month] : {};
+      var myPt = calcPts(u.id, month);
+
+      // 出勤予定日数（シフトから）
+      var workedDays = myDays.length;
+      var scheduledDays = 0;
+      var today = new Date();
+      Object.keys(ST.shifts).forEach(function(key) {
+        if (key.indexOf(u.id + '_') === 0) {
+          var sh = ST.shifts[key];
+          Object.keys(sh).forEach(function(d) {
+            if (d.indexOf(month) === 0 && sh[d] && sh[d] !== '休') {
+              var dObj = new Date(d);
+              if (dObj > today) scheduledDays++;
+            }
+          });
+        }
+      });
+      var avgPt = workedDays > 0 ? myPt / workedDays : 0;
+      var forecast = myPt + avgPt * scheduledDays;
+
+      // 商材サマリーカード
+      var prodCards = '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;">';
+      PRODS.forEach(function(p) {
+        prodCards += '<div style="background:#eef2f7;border:1px solid #c0d0e8;border-radius:8px;padding:8px 14px;min-width:100px;text-align:center;">' +
+          '<div style="font-size:11px;color:#1e3a6e;font-weight:700;margin-bottom:3px;">' + p.name + '</div>' +
+          '<div style="font-size:20px;font-weight:900;font-family:monospace;color:#1a2640;">' + (myProg[p.key]||0) + '</div>' +
+          '<div style="font-size:10px;color:var(--dim);">件</div>' +
+          '</div>';
+      });
+      prodCards += '<div style="background:linear-gradient(135deg,#1e3a6e,#2d5a9e);border-radius:8px;padding:8px 14px;min-width:120px;text-align:center;">' +
+        '<div style="font-size:11px;color:rgba(255,255,255,.8);font-weight:700;margin-bottom:3px;">合計ポイント</div>' +
+        '<div style="font-size:20px;font-weight:900;font-family:monospace;color:#fff;">' + myPt.toFixed(1) + '</div>' +
+        '<div style="font-size:10px;color:rgba(255,255,255,.7);">pt</div>' +
+        '</div>';
+      prodCards += '</div>';
+
+      // 出勤・着地予想カード
+      var forecastCard = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">' +
+        '<div style="background:#f8f9fb;border:1px solid var(--border);border-radius:8px;padding:8px 14px;min-width:110px;text-align:center;">' +
+        '<div style="font-size:11px;color:var(--dim);font-weight:700;margin-bottom:3px;">稼働済み</div>' +
+        '<div style="font-size:20px;font-weight:900;font-family:monospace;">' + workedDays + '</div>' +
+        '<div style="font-size:10px;color:var(--dim);">日</div></div>' +
+        '<div style="background:#f8f9fb;border:1px solid var(--border);border-radius:8px;padding:8px 14px;min-width:110px;text-align:center;">' +
+        '<div style="font-size:11px;color:var(--dim);font-weight:700;margin-bottom:3px;">残出勤予定</div>' +
+        '<div style="font-size:20px;font-weight:900;font-family:monospace;">' + scheduledDays + '</div>' +
+        '<div style="font-size:10px;color:var(--dim);">日</div></div>' +
+        '<div style="background:linear-gradient(135deg,#eef2f7,#dde6f5);border:1px solid #c0d0e8;border-radius:8px;padding:8px 14px;min-width:140px;text-align:center;">' +
+        '<div style="font-size:11px;color:#1e3a6e;font-weight:700;margin-bottom:3px;">📊 月末着地予想</div>' +
+        '<div style="font-size:20px;font-weight:900;font-family:monospace;color:#1e3a6e;">' + forecast.toFixed(1) + '</div>' +
+        '<div style="font-size:10px;color:var(--dim);">pt（平均' + avgPt.toFixed(1) + 'pt/日）</div></div>' +
+        '</div>';
+
+      bodyHtml = '<div class="sheet-body">' + prodCards + forecastCard +
+        '<div style="font-size:12px;font-weight:700;color:var(--dim);margin-bottom:6px;">日別カウンター記録</div>' +
+        '<table class="sheet-table"><thead><tr><th class="name-col">日付</th>';
+      showItems.forEach(function(i) { bodyHtml += '<th>' + i + '</th>'; });
+      bodyHtml += '</tr></thead><tbody>';
+      myDays.forEach(function(d) {
+        var dow = ['日','月','火','水','木','金','土'][new Date(d.date).getDay()];
+        bodyHtml += '<tr><td class="name-col">' + d.date.slice(5) + '(' + dow + ')</td>';
+        showItems.forEach(function(i) { bodyHtml += '<td>' + (d.data[i]||0) + '</td>'; });
+        bodyHtml += '</tr>';
+      });
+      bodyHtml += '<tr style="background:#eef2f7;font-weight:700"><td class="name-col">合計</td>';
+      showItems.forEach(function(i) { bodyHtml += '<td>' + totals[i] + '</td>'; });
+      bodyHtml += '</tr>';
+      bodyHtml += '</tbody></table></div>';
+    }
+  }
+
+  return '<h3 class="sec-title">📊 全員確認（管理者）</h3>' +
+    '<div class="sheet-wrap">' + tabsHtml + bodyHtml + '</div>';
+}
+
+function switchSheetTab(uid) {
+  sheetTab = uid;
+  document.querySelector('.sheet-wrap').outerHTML; // force
+  reTab();
+}
+function bindProgress() {
+  document.querySelectorAll('.pi').forEach(function(el) {
+    el.addEventListener('change', function() {
+      var uid = el.getAttribute('data-uid');
+      var prod = el.getAttribute('data-prod');
+      var month = ST.month;
+      var val = parseInt(el.value) || 0;
+      if (!ST.progress[uid]) ST.progress[uid] = {};
+      if (!ST.progress[uid][month]) ST.progress[uid][month] = {};
+      ST.progress[uid][month][prod] = val;
+      var rowId = ST.progress[uid][month]._rowId;
+      var data = Object.assign({}, ST.progress[uid][month]);
+      delete data._rowId;
+      var pid = rowId || ('prog_' + uid + '_' + month.replace('-',''));
+      dbUpsert('progress', {id: pid, team_id: ST.teamId, user_id: uid, month: month, data: data}).then(function() {
+        ST.progress[uid][month]._rowId = pid;
+        toast('更新しました');
+      });
+    });
+  });
+  document.querySelectorAll('.ki').forEach(function(el) {
+    el.addEventListener('change', function() {
+      var item = el.getAttribute('data-item');
+      var uid = el.getAttribute('data-uid') || ST.user.id;
+      var val = parseInt(el.value) || 0;
+      if (!ST.kpis[uid]) ST.kpis[uid] = {};
+      ST.kpis[uid][item] = {target: val};
+      var rowId = ST.kpis[uid]._rowId;
+      var data = Object.assign({}, ST.kpis[uid]);
+      delete data._rowId;
+      var kid = rowId || ('kpi_' + uid);
+      dbUpsert('kpis', {id: kid, team_id: ST.teamId, user_id: uid, data: data}).then(function() {
+        ST.kpis[uid]._rowId = kid;
+      });
+    });
+  });
+}
+
+// ============================================================
+// REPORTS
+// ============================================================
+function renderReports() {
+  var rt = ST.rType;
+  var month = ST.month;
+  var list = Object.values(ST.reports[rt] || {}).filter(function(r) { return r.date && r.date.indexOf(month) === 0; });
+  list.sort(function(a,b) { return new Date(b.date) - new Date(a.date); });
+  var html = '<div class="stabs">' +
+    '<button class="stab' + (rt==='daily'?' active':'') + '" onclick="rtSwitch(\'daily\')">📅 日報</button>' +
+    '<button class="stab' + (rt==='weekly'?' active':'') + '" onclick="rtSwitch(\'weekly\')">📆 週報</button>' +
+    '</div>' +
+    '<div class="rform"><h3>' + (rt==='daily'?'日報':'週報') + 'を投稿</h3>' +
+    '<div class="fg"><label>成果・実績 *</label><textarea id="rf-a" placeholder="今日の成果や達成したことを記入"></textarea></div>' +
+    '<div class="fg"><label>学び・気づき</label><textarea id="rf-l" placeholder="学んだことや気づいたこと"></textarea></div>' +
+    '<div class="fg"><label>改善点・課題</label><textarea id="rf-i" placeholder="改善したいことや課題"></textarea></div>' +
+    '<div class="fg"><label>その他</label><textarea id="rf-f" placeholder="その他共有したいこと"></textarea></div>' +
+    '<button class="btn btn-p" id="r-sub-btn" style="max-width:160px">投稿する</button>' +
+    '</div>' +
+    '<div class="rlist">';
+  if (!list.length) {
+    html += '<div class="empty"><div class="ei">📭</div><p>まだ' + (rt==='daily'?'日報':'週報') + 'はありません</p></div>';
+  } else {
+    list.forEach(function(r) { html += renderRCard(r); });
+  }
+  return html + '</div>';
+}
+function renderRCard(r) {
+  var uid = ST.user.id;
+  var likes = r.likes || [];
+  var liked = likes.indexOf(uid) >= 0;
+  var comments = r.comments || [];
+  var ds = new Date(r.date).toLocaleString('ja-JP', {month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
+  var html = '<div class="rcard">' +
+    '<div class="rchead"><div class="rcav">' + (r.userName||'?').charAt(0) + '</div>' +
+    '<span class="rcname">' + r.userName + '</span>' +
+    '<span class="rcdate">' + ds + '</span></div>' +
+    '<div class="rcbody">' +
+    '<p><strong>成果・実績</strong>' + r.achievements + '</p>' +
+    (r.learnings ? '<p><strong>学び・気づき</strong>' + r.learnings + '</p>' : '') +
+    (r.improvements ? '<p><strong>改善点</strong>' + r.improvements + '</p>' : '') +
+    (r.freeText ? '<p><strong>その他</strong>' + r.freeText + '</p>' : '') +
+    '</div>' +
+    '<div class="ract">' +
+    '<button class="lkbtn' + (liked?' liked':'') + '" onclick="doLike(\'' + r.id + '\')">👍 ' + likes.length + '</button>' +
+    '<button class="cmtbtn" onclick="toggleCmt(\'cf-' + r.id + '\')">💬 コメント(' + comments.length + ')</button>' +
+    '</div>';
+  if (comments.length) {
+    html += '<div class="cmts">';
+    comments.forEach(function(c) {
+      html += '<div class="cmt"><span class="cma">' + c.userName + ':</span><span>' + c.text + '</span></div>';
+    });
+    html += '</div>';
+  }
+  html += '<div id="cf-' + r.id + '" style="display:none" class="cmtinp">' +
+    '<input type="text" placeholder="コメントを入力" id="ci-' + r.id + '"/>' +
+    '<button onclick="doComment(\'' + r.id + '\')">送信</button>' +
+    '</div></div>';
+  return html;
+}
+function rtSwitch(t) { ST.rType = t; reTab(); }
+function toggleCmt(id) { var el = document.getElementById(id); if (el) el.style.display = el.style.display === 'none' ? 'flex' : 'none'; }
+function bindReports() {
+  var btn = document.getElementById('r-sub-btn');
+  if (btn) btn.addEventListener('click', function() {
+    var a = document.getElementById('rf-a').value.trim();
+    if (!a) { toast('成果・実績は必須です', true); return; }
+    var rid = 'rep_' + Date.now();
+    var row = {
+      id: rid, team_id: ST.teamId, user_id: ST.user.id, user_name: ST.user.name,
+      type: ST.rType, date: todayStr(),
+      achievements: a, learnings: document.getElementById('rf-l').value,
+      improvements: document.getElementById('rf-i').value,
+      free_text: document.getElementById('rf-f').value,
+      likes: [], comments: []
+    };
+    dbInsert('reports', row).then(function() {
+      if (!ST.reports[ST.rType]) ST.reports[ST.rType] = {};
+      ST.reports[ST.rType][rid] = {
+        id: rid, userId: ST.user.id, userName: ST.user.name,
+        type: ST.rType, date: row.date,
+        achievements: a, learnings: row.learnings, improvements: row.improvements, freeText: row.free_text,
+        likes: [], comments: []
+      };
+      toast((ST.rType==='daily'?'日報':'週報') + 'を投稿しました！');
+      reTab();
+    });
+  });
+}
+function doLike(rid) {
+  var uid = ST.user.id;
+  var r = ST.reports[ST.rType][rid];
+  if (!r) return;
+  var likes = r.likes.slice();
+  var idx = likes.indexOf(uid);
+  if (idx >= 0) likes.splice(idx, 1); else likes.push(uid);
+  dbUpdateRow('reports', rid, {likes: likes}).then(function() {
+    r.likes = likes; reTab();
+  });
+}
+function doComment(rid) {
+  var input = document.getElementById('ci-' + rid);
+  var text = input ? input.value.trim() : '';
+  if (!text) return;
+  var r = ST.reports[ST.rType][rid];
+  if (!r) return;
+  var comments = r.comments.concat([{userId: ST.user.id, userName: ST.user.name, text: text, date: new Date().toISOString()}]);
+  dbUpdateRow('reports', rid, {comments: comments}).then(function() {
+    r.comments = comments; reTab();
+  });
+}
+
+// ============================================================
+// RANKING
+// ============================================================
+function renderRanking() {
+  var month = ST.month;
+  var users = Object.values(ST.users);
+  var userCnts = {};
+  Object.keys(ST.counters).forEach(function(key) {
+    var parts = key.split('_');
+    var uid = parts[0] + '_' + parts[1];
+    var dt = parts.slice(2).join('_');
+    if (dt.indexOf(month) === 0) {
+      if (!userCnts[uid]) userCnts[uid] = {};
+      var val = ST.counters[key];
+      CITEMS.forEach(function(i) { userCnts[uid][i] = (userCnts[uid][i]||0) + (val[i]||0); });
+    }
+  });
+  var rt = ST.rkType;
+  var rankings = users.map(function(u) {
+    var score = 0; var unit = '件';
+    if (rt === 'total') { score = calcPts(u.id, month); unit = 'pt'; }
+    else if (PRODS.find(function(p) { return p.key === rt; })) { score = (ST.progress[u.id] && ST.progress[u.id][month]) ? (ST.progress[u.id][month][rt]||0) : 0; }
+    else { score = userCnts[u.id] ? (userCnts[u.id][rt]||0) : 0; }
+    return {id: u.id, name: u.name, score: score, unit: unit};
+  });
+  rankings.sort(function(a,b) { return b.score - a.score; });
+
+  var tabsHtml = '<button class="rktab' + (rt==='total'?' active':'') + '" onclick="rkSwitch(\'total\')">総合</button>';
+  PRODS.forEach(function(p) { tabsHtml += '<button class="rktab' + (rt===p.key?' active':'') + '" onclick="rkSwitch(\'' + p.key + '\')">' + p.name + '</button>'; });
+  RANK_COUNTER_ITEMS.forEach(function(i) { tabsHtml += '<button class="rktab' + (rt===i?' active':'') + '" onclick="rkSwitch(\'' + i + '\')">' + i + '</button>'; });
+
+  var unit = rankings.length ? rankings[0].unit : '件';
+  var listHtml = '';
+  rankings.forEach(function(item, idx) {
+    var cls = idx===0?'gold':idx===1?'silver':idx===2?'bronze':'other';
+    var isMe = item.id === ST.user.id;
+    var sc = rt === 'total' ? item.score.toFixed(1) : Math.floor(item.score);
+    listHtml += '<div class="rkitem' + (isMe?' me':'') + '">' +
+      '<div class="rkbadge ' + cls + '">' + (idx+1) + '</div>' +
+      '<div class="rkin"><div class="rkname">' + item.name + (isMe?' ← あなた':'') + '</div>' +
+      '<span class="rkscore">' + sc + '</span><span class="rkunit">' + unit + '</span></div>' +
+      '</div>';
+  });
+  var teamTotal = users.reduce(function(s, u) { return s + calcPts(u.id, month); }, 0);
+  var teamBanner = '<div class="team-total-banner">' +
+    '<div><div class="team-total-label">チーム合計ポイント（' + month.replace('-','年') + '月）</div>' +
+    '<div><span class="team-total-score">' + teamTotal.toFixed(1) + '</span><span class="team-total-unit">pt</span></div></div>' +
+    '<div style="font-size:28px">🏆</div>' +
+    '</div>';
+  return '<h3 class="sec-title">🏆 ' + month.replace('-','年') + '月 ランキング</h3>' +
+    teamBanner +
+    '<div class="rktabs">' + tabsHtml + '</div>' +
+    '<div class="rkl">' + listHtml + '</div>';
+}
+function rkSwitch(t) { ST.rkType = t; reTab(); }
+
+// ============================================================
+// SHIFT
+// ============================================================
+// shiftView: 'week' or 'month'
+var shiftView = 'month';
+var shiftCalMonth = new Date().toISOString().slice(0,7);
+
+function renderShift() {
+  var viewToggle = '<div style="display:flex;gap:6px;margin-bottom:12px">' +
+    '<button class="stab' + (shiftView==='month'?' active':'') + '" onclick="svs_m()">📅 月カレンダー</button>' +
+    '<button class="stab' + (shiftView==='week'?' active':'') + '" onclick="svs_w()">📋 週表示</button>' +
+    '</div>';
+  if (shiftView === 'month') return '<h3 class="sec-title">📅 シフト管理</h3>' + viewToggle + renderShiftCalendar();
+  return '<h3 class="sec-title">📅 シフト管理</h3>' + viewToggle + renderShiftWeek();
+}
+function shiftViewSwitch(v) { shiftView = v; reTab(); }
+function svs_m() { shiftViewSwitch('month'); }
+function svs_w() { shiftViewSwitch('week'); }
+
+// シフト一時データ（保存前）
+var calShiftTemp = {};
+
+function renderShiftCalendar() {
+  var parts = shiftCalMonth.split('-');
+  var y = parseInt(parts[0]); var m = parseInt(parts[1]);
+  var firstDay = new Date(y, m-1, 1);
+  var lastDay = new Date(y, m, 0);
+  var users = Object.values(ST.users);
+  var uid = ST.user.id;
+  var DOWS = ['日','月','火','水','木','金','土'];
+
+  // 既存シフトをtempに読み込み（初回のみ）
+  if (Object.keys(calShiftTemp).length === 0) {
+    for (var d2 = 1; d2 <= lastDay.getDate(); d2++) {
+      var ds2 = new Date(y, m-1, d2).toISOString().split('T')[0];
+      var ws2 = mondayOf(ds2);
+      var key2 = uid + '_' + ws2;
+      var sh2 = ST.shifts[key2] || {};
+      if (sh2[ds2]) calShiftTemp[ds2] = sh2[ds2];
+    }
+  }
+
+  var html = '<div class="cal-header">' +
+    '<button onclick="calMonthMove(-1)">◀</button>' +
+    '<span>' + y + '年' + m + '月</span>' +
+    '<button onclick="calMonthMove(1)">▶</button>' +
+    '</div>' +
+    '<div class="cal-dow">' + DOWS.map(function(d,i){ return '<span style="color:' + (i===0?'#cc0000':i===6?'#1e3a6e':'var(--dim)') + '">' + d + '</span>'; }).join('') + '</div>' +
+    '<div class="cal-grid">';
+  var startDow = firstDay.getDay();
+  var totalCells = Math.ceil((startDow + lastDay.getDate()) / 7) * 7;
+  var todayS = todayStr();
+  for (var ci = 0; ci < totalCells; ci++) {
+    var dateObj = new Date(y, m-1, ci - startDow + 1);
+    var dateStr = dateObj.toISOString().split('T')[0];
+    var day = dateObj.getDate();
+    var dow = dateObj.getDay();
+    var isOther = dateObj.getMonth() !== m-1;
+    var isToday = dateStr === todayS;
+    var numCls = dow===0?'sun':dow===6?'sat':'';
+    html += '<div class="cal-day' + (isOther?' other-month':'') + (isToday?' today':'') + '">' +
+      '<div class="cal-num ' + numCls + '">' + day + '</div>';
+    if (!isOther) {
+      var myVal = calShiftTemp[dateStr] || '';
+      var isRest = myVal === '休';
+      var hasTime = myVal && myVal !== '休' && myVal.indexOf(':') >= 0;
+      var statusCls = isRest ? 'kyuuka' : (myVal ? 'jikan' : '');
+      var statusLbl = isRest ? '休' : hasTime ? myVal : myVal ? myVal : '';
+      if (myVal) {
+        html += '<div class="cal-status ' + statusCls + '">' + statusLbl + '</div>';
+      }
+      html += '<div class="cal-tap-btns">' +
+        '<button class="cal-tap-btn shukkin" data-d="' + dateStr + '" onclick="calTapOut(this)">出勤時間</button>' +
+        '<button class="cal-tap-btn kyuuka" data-d="' + dateStr + '" onclick="calTapRest(this)">休</button>' +
+        (myVal ? '<button class="cal-tap-btn clear" data-d="' + dateStr + '" onclick="calTapClear(this)">✕</button>' : '') +
+        '</div>';
+    }
+    users.forEach(function(u) {
+      if (u.id === uid) return;
+      var ws = mondayOf(dateStr);
+      var key = u.id + '_' + ws;
+      var sh = ST.shifts[key] || {};
+      var val = sh[dateStr] || '';
+      if (val) html += '<span class="cal-shift" title="' + u.name + '">' + u.name.charAt(0) + ':' + val + '</span>';
+    });
+    html += '</div>';
+  }
+  html += '</div>';
+  html += '<div class="cal-legend" style="margin-bottom:60px"><span>🟦 出勤　⬜ 休み　青バッジ = 他メンバー</span></div>';
+  html += '<div class="shift-save-bar"><button class="shift-save-btn" onclick="saveShiftCal()">✓ シフトを保存する</button></div>';
+  return html;
+}
+
+function calTapOut(btn) {
+  var dateStr = btn.getAttribute('data-d');
+  var existing = calShiftTemp[dateStr] || '';
+  // 既存の時間をパース
+  var startVal = '09:00', endVal = '18:00';
+  if (existing && existing.indexOf('〜') >= 0) {
+    var parts2 = existing.split('〜');
+    startVal = parts2[0] || '09:00';
+    endVal = parts2[1] || '18:00';
+  }
+  showTimeModal(dateStr, startVal, endVal);
+}
+
+function showTimeModal(dateStr, startVal, endVal) {
+  var modal = document.createElement('div');
+  modal.className = 'time-modal-bg';
+  modal.id = 'time-modal';
+  var d = new Date(dateStr);
+  var label = (d.getMonth()+1) + '/' + d.getDate() + '(' + ['日','月','火','水','木','金','土'][d.getDay()] + ')';
+  modal.innerHTML = '<div class="time-modal">' +
+    '<h3>' + label + ' の出勤時間</h3>' +
+    '<div class="time-row"><label>開始</label><input type="time" id="tm-start" value="' + startVal + '"/></div>' +
+    '<div class="time-row"><label>終了</label><input type="time" id="tm-end" value="' + endVal + '"/></div>' +
+    '<div class="time-modal-btns">' +
+    '<button class="tm-cancel" onclick="closeTimeModal()">キャンセル</button>' +
+    '<button class="tm-rest" onclick="setRestModal(this)" data-d="' + dateStr + '">休みに変更</button>' +
+    '<button class="tm-ok" onclick="saveModal(this)" data-d="' + dateStr + '">✓ 保存</button>' +
+    '</div></div>';
+  document.body.appendChild(modal);
+}
+
+function setRestModal(btn) { setRestFromModal(btn.getAttribute('data-d')); }
+function saveModal(btn) { saveTimeModal(btn.getAttribute('data-d')); }
+function closeTimeModal() {
+  var m = document.getElementById('time-modal');
+  if (m) m.parentNode.removeChild(m);
+}
+
+function saveTimeModal(dateStr) {
+  var s = document.getElementById('tm-start');
+  var e = document.getElementById('tm-end');
+  var val = (s ? s.value : '09:00') + '〜' + (e ? e.value : '18:00');
+  closeTimeModal();
+  tapShift(dateStr, val);
+}
+
+function setRestFromModal(dateStr) {
+  closeTimeModal();
+  tapShift(dateStr, '休');
+}
+function calTapRest(btn) { tapShift(btn.getAttribute('data-d'), '休'); }
+function calTapClear(btn) { tapShift(btn.getAttribute('data-d'), ''); }
+function tapShift(dateStr, val) {
+  if (val === '') {
+    delete calShiftTemp[dateStr];
+  } else {
+    calShiftTemp[dateStr] = val;
+  }
+  // カレンダーのみ再描画
+  var area = document.getElementById('tab-area');
+  if (area) {
+    area.innerHTML = renderShift();
+    bindTab();
+  }
+}
+
+function renderShiftWeek() {
+  var ws = ST.shiftWeek || mondayOf(todayStr());
+  var dates = weekDates(ws);
+  var users = Object.values(ST.users);
+  var html = '<div class="cal-header">' +
+    '<button onclick="shiftMove(-1)">◀ 前の週</button>' +
+    '<span>' + fmtDate(dates[0]) + ' 〜 ' + fmtDate(dates[6]) + '</span>' +
+    '<button onclick="shiftMove(1)">次の週 ▶</button>' +
+    '<button class="btn btn-p bsm" onclick="saveShift()">保存</button>' +
+    '</div>' +
+    '<div class="sw"><table class="stbl"><thead><tr><th class="ucol">名前</th>';
+  dates.forEach(function(d) { html += '<th>' + fmtDate(d) + '</th>'; });
+  html += '</tr></thead><tbody>';
+  users.forEach(function(u) {
+    var key = u.id + '_' + ws;
+    var myShift = ST.shifts[key] || {};
+    var isMe = u.id === ST.user.id;
+    html += '<tr><td class="ucol">' + u.name + '</td>';
+    dates.forEach(function(d) {
+      var val = myShift[d] || '';
+      html += '<td>' + (isMe
+        ? '<input class="sinp" type="text" id="sh-' + u.id + '-' + d + '" value="' + val + '" placeholder="出/休"/>'
+        : '<span style="font-size:12px;color:' + (val?'var(--text)':'var(--dim)') + '">' + (val||'—') + '</span>'
+      ) + '</td>';
+    });
+    html += '</tr>';
+  });
+  return html + '</tbody></table></div>';
+}
+
+function calMonthMove(d) {
+  var parts = shiftCalMonth.split('-');
+  var y = parseInt(parts[0]); var m = parseInt(parts[1]);
+  var nd = new Date(y, m-1+d, 1);
+  shiftCalMonth = nd.getFullYear() + '-' + String(nd.getMonth()+1).padStart(2,'0');
+  calShiftTemp = {};
+  reTab();
+}
+
+function saveShiftCal() {
+  var uid = ST.user.id;
+  var byWeek = {};
+  Object.keys(calShiftTemp).forEach(function(ds) {
+    var ws = mondayOf(ds);
+    if (!byWeek[ws]) byWeek[ws] = {};
+    if (calShiftTemp[ds]) byWeek[ws][ds] = calShiftTemp[ds];
+  });
+  // 削除処理：既存シフトで今月分をクリア
+  var parts = shiftCalMonth.split('-');
+  var y = parseInt(parts[0]); var m = parseInt(parts[1]);
+  var lastDay = new Date(y, m, 0);
+  var allWeeks = {};
+  for (var day = 1; day <= lastDay.getDate(); day++) {
+    var ds2 = new Date(y, m-1, day).toISOString().split('T')[0];
+    var ws2 = mondayOf(ds2);
+    allWeeks[ws2] = true;
+  }
+  Object.keys(allWeeks).forEach(function(ws) {
+    if (!byWeek[ws]) byWeek[ws] = {};
+  });
+  var promises = Object.keys(byWeek).map(function(ws) {
+    var key = uid + '_' + ws;
+    var existing = ST.shifts[key] || {};
+    // 今月分だけ上書き、他月分は残す
+    var merged = Object.assign({}, existing);
+    // 今月の各日をtempから反映
+    var wDates = weekDates(ws);
+    wDates.forEach(function(d) {
+      if (d.indexOf(shiftCalMonth) === 0) {
+        if (calShiftTemp[d]) merged[d] = calShiftTemp[d];
+        else delete merged[d];
+      }
+    });
+    var rowId = existing._rowId;
+    var sid = rowId || ('shift_' + uid + '_' + yyyymmdd(ws));
+    delete merged._rowId;
+    return dbUpsert('shifts', {id: sid, team_id: ST.teamId, user_id: uid, week_start: ws, data: merged}).then(function() {
+      merged._rowId = sid;
+      ST.shifts[key] = merged;
+    });
+  });
+  Promise.all(promises).then(function() {
+    toast('シフトを保存しました！');
+    calShiftTemp = {};
+    reTab();
+  });
+}
+
+function shiftMove(d) {
+  ST.shiftWeek = addDays(ST.shiftWeek || mondayOf(todayStr()), 7*d);
+  reTab();
+}
+function bindShift() {}
+function saveShift() {
+  var ws = ST.shiftWeek || mondayOf(todayStr());
+  var uid = ST.user.id;
+  var dates = weekDates(ws);
+  var data = {};
+  dates.forEach(function(d) {
+    var el = document.getElementById('sh-' + uid + '-' + d);
+    if (el && el.value.trim()) data[d] = el.value.trim();
+  });
+  var key = uid + '_' + ws;
+  var rowId = ST.shifts[key] ? ST.shifts[key]._rowId : null;
+  var sid = rowId || ('shift_' + uid + '_' + yyyymmdd(ws));
+  dbUpsert('shifts', {id: sid, team_id: ST.teamId, user_id: uid, week_start: ws, data: data}).then(function() {
+    var stored = Object.assign({}, data);
+    stored._rowId = sid;
+    ST.shifts[key] = stored;
+    toast('シフトを保存しました！');
+    reTab();
+  });
+}
+
+// ============================================================
+// MY PAGE
+// ============================================================
+function renderMyPage() {
+  var u = ST.user;
+  var month = ST.month;
+  var myCnts = {};
+  Object.keys(ST.counters).forEach(function(key) {
+    if (key.indexOf(u.id + '_') === 0) {
+      var dt = key.slice(u.id.length + 1);
+      if (dt.indexOf(month) === 0) {
+        var val = ST.counters[key];
+        CITEMS.forEach(function(i) { myCnts[i] = (myCnts[i]||0) + (val[i]||0); });
+      }
+    }
+  });
+  var myProg = (ST.progress[u.id] && ST.progress[u.id][month]) ? ST.progress[u.id][month] : {};
+  var myPt = calcPts(u.id, month);
+  var myDaily = Object.values(ST.reports.daily || {}).filter(function(r) { return r.userId===u.id && r.date && r.date.indexOf(month)===0; });
+  var myWeekly = Object.values(ST.reports.weekly || {}).filter(function(r) { return r.userId===u.id && r.date && r.date.indexOf(month)===0; });
+
+  var pastMonths = [];
+  for (var i = 1; i <= 3; i++) {
+    var pm = recentMonths(month, i+1)[i];
+    var ppt = calcPts(u.id, pm);
+    var pcnts = {};
+    Object.keys(ST.counters).forEach(function(key) {
+      if (key.indexOf(u.id + '_') === 0) {
+        var dt = key.slice(u.id.length + 1);
+        if (dt.indexOf(pm) === 0) {
+          var val = ST.counters[key];
+          CITEMS.forEach(function(ci) { pcnts[ci] = (pcnts[ci]||0) + (val[ci]||0); });
+        }
+      }
+    });
+    var pmParts = pm.split('-');
+    pastMonths.push({label: pmParts[0] + '年' + parseInt(pmParts[1]) + '月', pt: ppt, cnts: pcnts});
+  }
+
+  var prodHtml = PRODS.map(function(p) {
+    return '<div class="mprow"><span class="mplbl">' + p.name + '</span><span class="mpval">' + (myProg[p.key]||0) + '件</span></div>';
+  }).join('');
+  prodHtml += '<div class="mprow" style="border-top:1px solid var(--border);margin-top:4px;padding-top:8px"><span class="mplbl">合計ポイント</span><span class="mpval">' + myPt.toFixed(1) + 'pt</span></div>';
+
+  // 月末着地予想計算
+  var today = new Date();
+  var daysInMonth = new Date(today.getFullYear(), today.getMonth()+1, 0).getDate();
+  var dayOfMonth = today.getDate();
+  // 今月の出勤日数（シフトから）
+  var myWorkedDays = 0;
+  var myScheduledDays = 0;
+  Object.keys(ST.shifts).forEach(function(key) {
+    if (key.indexOf(u.id + '_') === 0) {
+      var sh = ST.shifts[key];
+      Object.keys(sh).forEach(function(d) {
+        if (d.indexOf(month) === 0 && sh[d] && sh[d] !== '休') {
+          var dObj = new Date(d);
+          if (dObj <= today) myWorkedDays++;
+          else myScheduledDays++;
+        }
+      });
+    }
+  });
+  var totalScheduled = myWorkedDays + myScheduledDays;
+  var avgPtPerDay = myWorkedDays > 0 ? myPt / myWorkedDays : 0;
+  var forecast = myPt + avgPtPerDay * myScheduledDays;
+  var forecastHtml = totalScheduled > 0
+    ? '<div class="forecast-card">' +
+      '<div class="forecast-label">📊 月末着地予想（シフト連動）</div>' +
+      '<div class="forecast-val">' + forecast.toFixed(1) + '<span style="font-size:13px;font-weight:400;color:var(--dim)">pt</span></div>' +
+      '<div class="forecast-sub">現在 ' + myPt.toFixed(1) + 'pt ÷ 稼働' + myWorkedDays + '日 × 残り' + myScheduledDays + '日分を加算</div>' +
+      '</div>'
+    : '<div class="forecast-card"><div class="forecast-label">📊 月末着地予想</div><div style="font-size:12px;color:var(--dim)">シフトを入力すると予想が表示されます</div></div>';
+  prodHtml += forecastHtml;
+
+  var cntHtml = MP_COUNTER_ITEMS.map(function(item) {
+    var val = item === 'au' ? (myProg['au']||0) : (myCnts[item]||0);
+    return '<div class="mprow"><span class="mplbl">' + item + '</span><span class="mpval">' + val + '</span></div>';
+  }).join('');
+  cntHtml += '<div class="divider"></div>' +
+    '<div class="mpsec">レポート数</div>' +
+    '<div class="mprow"><span class="mplbl">日報</span><span class="mpval">' + myDaily.length + '件</span></div>' +
+    '<div class="mprow"><span class="mplbl">週報</span><span class="mpval">' + myWeekly.length + '件</span></div>';
+
+  var probHtml = PROB_CHAINS.map(function(chain) {
+    var f = myCnts[chain.from] || 0;
+    var t = myCnts[chain.to] || 0;
+    var pct = f > 0 ? Math.round(t/f*1000)/10 : 0;
+    var barW = Math.min(pct, 100);
+    return '<div class="prob-card">' +
+      '<div class="prob-lbl">' + chain.label + '</div>' +
+      '<div class="prob-val">' + pct + '<span style="font-size:14px">%</span></div>' +
+      '<div class="prob-sub">' + f + '件 → ' + t + '件</div>' +
+      '<div class="prob-bar"><div class="prob-fill" style="width:' + barW + '%"></div></div>' +
+      '</div>';
+  }).join('');
+
+  var histHtml = pastMonths.map(function(pm) {
+    var stats = '<span>合計: <strong>' + pm.pt.toFixed(1) + 'pt</strong></span> ' +
+      RANK_COUNTER_ITEMS.map(function(i) { return '<span>' + i + ': <strong>' + (pm.cnts[i]||0) + '</strong></span>'; }).join(' ');
+    return '<div class="histcard"><div class="histtitle">' + pm.label + '</div><div class="histstats">' + stats + '</div></div>';
+  }).join('');
+
+  var dailyHtml = '';
+  if (myDaily.length) {
+    dailyHtml = '<div class="mpcard full"><div class="mpsec">今月の日報（最新5件）</div>';
+    myDaily.slice(0,5).forEach(function(r) {
+      var ach = r.achievements.length > 100 ? r.achievements.slice(0,100) + '…' : r.achievements;
+      dailyHtml += '<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13px"><span style="color:var(--dim);font-size:11px">' + new Date(r.date).toLocaleDateString('ja-JP') + '</span><p style="margin-top:3px">' + ach + '</p></div>';
+    });
+    dailyHtml += '</div>';
+  }
+
+  return '<h3 class="sec-title">👤 マイページ — ' + month.replace('-','年') + '月</h3>' +
+    '<div class="mpgrid">' +
+    '<div class="mpcard"><div class="mpsec">今月の実績</div>' + prodHtml + '</div>' +
+    '<div class="mpcard"><div class="mpsec">今月のカウンター</div>' + cntHtml + '</div>' +
+    '<div class="mpcard full"><div class="mpsec">確率（転換率）</div><div class="prob-grid">' + probHtml + '</div></div>' +
+    '<div class="mpcard full"><div class="mpsec">過去3ヶ月の実績</div>' + histHtml + '</div>' +
+    dailyHtml +
+    '</div>';
+}
+
+// ============================================================
+// ADMIN
+// ============================================================
+function renderAdmin() {
+  var users = Object.values(ST.users);
+  var userListHtml = users.map(function(u) {
+    var r1 = u.role==='member'?' selected':'';
+    var r2 = u.role==='leader'?' selected':'';
+    var r3 = u.role==='admin'?' selected':'';
+    return '<div class="urow">' +
+      '<div class="urow-av">' + u.name.charAt(0) + '</div>' +
+      '<div class="urow-info"><div class="urow-name">' + u.name + '</div><span class="rtag ' + u.role + '">' + ROLES[u.role] + '</span></div>' +
+      '<div class="urow-acts">' +
+      '<input type="text" id="rn-' + u.id + '" placeholder="新しい名前"/>' +
+      '<button class="btn btn-s bsm" onclick="renameUser(\'' + u.id + '\')">名前変更</button>' +
+      '<select id="role-' + u.id + '"><option value="member"' + r1 + '>メンバー</option><option value="leader"' + r2 + '>リーダー</option><option value="admin"' + r3 + '>管理者</option></select>' +
+      '<button class="btn btn-s bsm" onclick="updateRole(\'' + u.id + '\')">権限変更</button>' +
+      '</div></div>';
+  }).join('');
+
+  var ciTagsHtml = CITEMS.map(function(item, i) {
+    return '<div class="citem-tag">' +
+      '<input type="text" value="' + item + '" id="ci-edit-' + i + '"/>' +
+      '<button onclick="delCItem(' + i + ')">✕</button>' +
+      '</div>';
+  }).join('');
+
+  var prodRowsHtml = PRODS.map(function(p, i) {
+    return '<tr>' +
+      '<td><input type="text" value="' + p.name + '" id="pn-' + i + '" style="width:100%;background:transparent;border:none;font-family:inherit;font-size:13px"/></td>' +
+      '<td><input type="number" value="' + p.points + '" id="pp-' + i + '" step="0.1" min="0" style="width:65px;background:transparent;border:none;font-family:monospace;font-size:13px;text-align:right"/></td>' +
+      '<td><button class="btn btn-d bsm" onclick="delProd(' + i + ')">✕</button></td>' +
+      '</tr>';
+  }).join('');
+
+  return '<h3 class="sec-title">⚙️ 管理パネル</h3>' +
+    '<div class="aform"><h3>新しいユーザーを追加</h3>' +
+    '<div class="irow">' +
+    '<input type="text" id="nu-name" placeholder="名前"/>' +
+    '<input type="password" id="nu-pass" placeholder="パスワード（6文字以上）"/>' +
+    '<select id="nu-role"><option value="member">メンバー</option><option value="leader">リーダー</option><option value="admin">管理者</option></select>' +
+    '<button class="btn btn-p bsm" id="nu-add-btn">追加</button>' +
+    '</div></div>' +
+    '<h3 class="sec-title">ユーザー一覧</h3>' +
+    '<div class="ulist">' + userListHtml + '</div>' +
+    '<h3 class="sec-title" style="margin-top:20px">🔢 カウンター項目</h3>' +
+    '<div class="aform"><h3>項目名を編集・削除・追加して「保存」してください</h3>' +
+    '<div class="citem-list">' + ciTagsHtml + '</div>' +
+    '<div class="irow">' +
+    '<input type="text" id="ci-new-inp" placeholder="新しい項目名"/>' +
+    '<button class="btn btn-s bsm" id="ci-add-btn">追加</button>' +
+    '<button class="btn btn-p bsm" id="ci-save-btn">✓ 保存</button>' +
+    '</div></div>' +
+    '<h3 class="sec-title" style="margin-top:20px">📦 商材</h3>' +
+    '<div class="aform"><h3>商材名・ポイントを編集・削除・追加して「保存」してください</h3>' +
+    '<div class="tw"><table class="dt" style="min-width:320px"><thead><tr><th>商材名</th><th>ポイント</th><th>削除</th></tr></thead><tbody>' + prodRowsHtml + '</tbody></table></div>' +
+    '<div class="irow" style="margin-top:10px">' +
+    '<input type="text" id="pn-new" placeholder="商材名"/>' +
+    '<input type="number" id="pp-new" placeholder="ポイント" step="0.1" min="0" style="width:90px"/>' +
+    '<button class="btn btn-s bsm" id="prod-add-btn">追加</button>' +
+    '<button class="btn btn-p bsm" id="prod-save-btn">✓ 保存</button>' +
+    '</div></div>';
+}
+
+function bindAdmin() {
+  var addBtn = document.getElementById('nu-add-btn');
+  if (addBtn) addBtn.addEventListener('click', function() {
+    var name = document.getElementById('nu-name').value.trim();
+    var pass = document.getElementById('nu-pass').value;
+    var role = document.getElementById('nu-role').value;
+    if (!name || !pass) { toast('名前とパスワードを入力してください', true); return; }
+    if (pass.length < 6) { toast('パスワードは6文字以上', true); return; }
+    var uid = 'user_' + Date.now();
+    var nu = {id: uid, team_id: ST.teamId, name: name, role: role, password: pass};
+    dbInsert('users', nu).then(function() {
+      ST.users[uid] = nu;
+      toast(name + 'を追加しました');
+      reTab();
+    });
+  });
+  var ciAdd = document.getElementById('ci-add-btn');
+  if (ciAdd) ciAdd.addEventListener('click', function() {
+    var v = document.getElementById('ci-new-inp').value.trim();
+    if (!v) return;
+    CITEMS.push(v);
+    reTab();
+    setTimeout(bindAdmin, 0);
+  });
+  var ciSave = document.getElementById('ci-save-btn');
+  if (ciSave) ciSave.addEventListener('click', function() {
+    var newItems = [];
+    CITEMS.forEach(function(_, i) {
+      var el = document.getElementById('ci-edit-' + i);
+      if (el && el.value.trim()) newItems.push(el.value.trim());
+    });
+    CITEMS = newItems;
+    saveTeamSettings().then(function() { toast('カウンター項目を保存しました！'); reTab(); });
+  });
+  var pAdd = document.getElementById('prod-add-btn');
+  if (pAdd) pAdd.addEventListener('click', function() {
+    var n = document.getElementById('pn-new').value.trim();
+    var p = parseFloat(document.getElementById('pp-new').value) || 0;
+    if (!n) { toast('商材名を入力してください', true); return; }
+    PRODS.push({key: 'prod_' + Date.now(), name: n, points: p});
+    reTab();
+    setTimeout(bindAdmin, 0);
+  });
+  var pSave = document.getElementById('prod-save-btn');
+  if (pSave) pSave.addEventListener('click', function() {
+    var newProds = [];
+    PRODS.forEach(function(p, i) {
+      var nel = document.getElementById('pn-' + i);
+      var pel = document.getElementById('pp-' + i);
+      if (nel && nel.value.trim()) {
+        newProds.push(Object.assign({}, p, {name: nel.value.trim(), points: parseFloat(pel ? pel.value : p.points) || p.points}));
+      }
+    });
+    PRODS = newProds;
+    saveTeamSettings().then(function() { toast('商材を保存しました！'); reTab(); });
+  });
+}
+function delCItem(i) { CITEMS.splice(i, 1); reTab(); setTimeout(bindAdmin, 0); }
+function delProd(i) { PRODS.splice(i, 1); reTab(); setTimeout(bindAdmin, 0); }
+function renameUser(uid) {
+  var el = document.getElementById('rn-' + uid);
+  var name = el ? el.value.trim() : '';
+  if (!name) return;
+  dbUpdateRow('users', uid, {name: name}).then(function() {
+    if (ST.users[uid]) ST.users[uid].name = name;
+    toast('名前を変更しました');
+    reTab();
+  });
+}
+function updateRole(uid) {
+  var el = document.getElementById('role-' + uid);
+  var role = el ? el.value : '';
+  if (!role) return;
+  dbUpdateRow('users', uid, {role: role}).then(function() {
+    if (ST.users[uid]) ST.users[uid].role = role;
+    toast('権限を変更しました');
+    reTab();
+  });
+}
+function saveTeamSettings() {
+  var sid = (ST.settings && ST.settings.id) ? ST.settings.id : ('settings_' + ST.teamId);
+  var payload = {id: sid, team_id: ST.teamId, counter_items: CITEMS, products: PRODS};
+  return dbUpsert('team_settings', payload).then(function() {
+    ST.settings = payload;
+  });
+}
+
+// ============================================================
+// BOOT
+// ============================================================
+(function boot() {
+  initDB();
+  var session = loadSession();
+  if (session && session.user && session.teamId) {
+    ST.user = session.user;
+    ST.teamId = session.teamId;
+    ST.teamName = session.teamName;
+    ST.shiftWeek = mondayOf(todayStr());
+    setHTML('<div class="loading"><div class="spin"></div>自動ログイン中...</div>');
+    loadData().then(function() { ST.mode = null; render(); }).catch(function() {
+      clearSession();
+      setHTML(renderLogin());
+      bindLogin();
+    });
+  } else {
+    setHTML(renderLogin());
+    bindLogin();
+  }
+})();
+</script>
+</body>
+</html>
